@@ -1238,47 +1238,74 @@ def run_nexus_pipeline(raw_text: str, artifact_id: Optional[str] = None) -> Nexu
     """
     Entry point for the BTP-Nexus pipeline.
     Initialises MLflow tracking run, executes LangGraph, returns final state.
+    MLflow is best-effort — pipeline runs fine without a tracking server (Railway).
     """
-    mlflow.set_experiment("BTP-Nexus-Entity-Resolution")
+    _artifact_id = artifact_id or str(uuid.uuid4())
 
-    with mlflow.start_run() as run:
-        mlflow.set_tags({
-            "service": "BTP-Nexus",
-            "version": "2.0.0",
-            "artifact_id": artifact_id or "unknown",
-        })
-        mlflow.log_param("max_resolver_loops", 3)
-        mlflow.log_param("pipeline_version", "2.0.0-coref")
-        mlflow.log_param("confidence_accept_threshold", 0.70)
-        mlflow.log_param("confidence_quarantine_threshold", 0.30)
+    # ── MLflow setup (best-effort — won't crash if server is unreachable) ──
+    run_id = None
+    try:
+        mlflow.set_experiment("BTP-Nexus-Entity-Resolution")
+        mlflow_active = True
+    except Exception as e:
+        logger.warning("[MLflow] Tracking server unreachable, running without MLflow: %s", e)
+        mlflow_active = False
 
+    def _log(*a, **kw):
+        """No-op MLflow logger used when server is unavailable."""
+        pass
+
+    # ── Execute pipeline ───────────────────────────────────────────────────
+    def _run_pipeline(run_id_override=None):
         initial_state = NexusState(
             raw_text=raw_text,
-            artifact_id=artifact_id or str(uuid.uuid4()),
-            mlflow_run_id=run.info.run_id,
+            artifact_id=_artifact_id,
+            mlflow_run_id=run_id_override,
         )
-
         nexus_graph = build_nexus_graph()
         final_state_dict = nexus_graph.invoke(initial_state)
-        final_state = NexusState(**final_state_dict)
+        return NexusState(**final_state_dict)
 
-        # Final summary metrics
-        total = (
-            len(final_state.resolved_entities)
-            + len(final_state.extracted_entities)  # leftover conflicts
-            + len(final_state.quarantined_entities)
-        )
-        mlflow.log_metric("total_entities_processed", total)
-        mlflow.log_metric("final_accepted", len(final_state.resolved_entities))
-        mlflow.log_metric("final_quarantined", len(final_state.quarantined_entities))
-        mlflow.log_metric("final_relationships", len(final_state.extracted_relationships))
-        mlflow.log_metric(
-            "acceptance_rate",
-            len(final_state.resolved_entities) / max(total, 1),
-        )
-        mlflow.log_text(final_state.graph_write_status, "graph_write_status.txt")
+    if mlflow_active:
+        try:
+            with mlflow.start_run() as run:
+                mlflow.set_tags({
+                    "service": "BTP-Nexus",
+                    "version": "2.0.0",
+                    "artifact_id": _artifact_id,
+                })
+                mlflow.log_param("max_resolver_loops", 3)
+                mlflow.log_param("pipeline_version", "2.0.0-coref")
+                mlflow.log_param("confidence_accept_threshold", 0.70)
+                mlflow.log_param("confidence_quarantine_threshold", 0.30)
 
-    logger.info("[Pipeline] Complete. Run ID: %s", run.info.run_id)
+                final_state = _run_pipeline(run.info.run_id)
+
+                total = (
+                    len(final_state.resolved_entities)
+                    + len(final_state.extracted_entities)
+                    + len(final_state.quarantined_entities)
+                )
+                mlflow.log_metric("total_entities_processed", total)
+                mlflow.log_metric("final_accepted",      len(final_state.resolved_entities))
+                mlflow.log_metric("final_quarantined",   len(final_state.quarantined_entities))
+                mlflow.log_metric("final_relationships", len(final_state.extracted_relationships))
+                mlflow.log_metric("acceptance_rate",     len(final_state.resolved_entities) / max(total, 1))
+                mlflow.log_text(final_state.graph_write_status, "graph_write_status.txt")
+            run_id = run.info.run_id
+        except Exception as e:
+            logger.warning("[MLflow] Tracking failed mid-run, falling back: %s", e)
+            final_state = _run_pipeline(None)
+    else:
+        final_state = _run_pipeline(None)
+
+    # Ensure mlflow_run_id is set in the returned state (used by API response)
+    if run_id and not final_state.mlflow_run_id:
+        final_state = final_state.model_copy(update={"mlflow_run_id": run_id})
+    if not final_state.mlflow_run_id:
+        final_state = final_state.model_copy(update={"mlflow_run_id": _artifact_id})
+
+    logger.info("[Pipeline] Complete. artifact_id=%s", _artifact_id)
     return final_state
 
 
