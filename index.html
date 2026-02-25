@@ -1118,7 +1118,7 @@ function showResults(accepted, conflicts, quarantined, runId, loops){
   updateSliders(accepted);
 
   // Live-update the knowledge graph with real entities from this run
-  updateKG(accepted, quarantined);
+  updateKG(accepted, conflicts, quarantined);
 }
 
 /* ── UPDATE SLIDERS from pipeline run ── */
