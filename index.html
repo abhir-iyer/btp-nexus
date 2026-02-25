@@ -254,7 +254,6 @@ textarea.demo-ta:focus{border-color:var(--gold);}
 .results-col+.results-col{border-left:1px solid var(--border);}
 .res-group-label{font-family:var(--mono);font-size:10px;letter-spacing:2px;text-transform:uppercase;margin-bottom:16px;padding-bottom:8px;border-bottom:1px solid var(--border);}
 .res-accepted .res-group-label{color:var(--forest);}
-.res-conflict .res-group-label{color:#8B6914;}
 .res-quarantine .res-group-label{color:#C0543F;}
 .entity-row{padding:10px 0;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;animation:fadeInUp .3s ease both;}
 .entity-row:last-child{border-bottom:none;}
@@ -262,7 +261,6 @@ textarea.demo-ta:focus{border-color:var(--gold);}
 .entity-bar-wrap{flex:1;height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
 .entity-bar{height:100%;width:0;border-radius:2px;transition:width 1.2s cubic-bezier(.16,1,.3,1);}
 .entity-bar-accepted{background:linear-gradient(90deg,var(--forest),#5EBF8A);}
-.entity-bar-conflict{background:linear-gradient(90deg,#8B6914,#C9A84C);}
 .entity-bar-q{background:linear-gradient(90deg,#C0543F,#E07B6A);}
 .entity-pct{font-family:var(--mono);font-size:10px;flex-shrink:0;}
 .entity-row.accepted .entity-pct{color:var(--forest);}
@@ -450,7 +448,7 @@ footer{background:var(--charcoal);padding:64px 60px;display:flex;justify-content
   .stages{padding:20px 16px;}
   .log-panel{font-size:10px;}
   .run-btn{font-size:11px;}
-  .results-grid{grid-template-columns:1fr!important;}
+  .results-grid{grid-template-columns:1fr;}
   .results-col+.results-col{border-left:none;border-top:1px solid var(--border);}
   .results-footer{grid-template-columns:repeat(3,1fr);}
 
@@ -609,15 +607,10 @@ footer{background:var(--charcoal);padding:64px 60px;display:flex;justify-content
         <span class="results-head-label">Pipeline Results</span>
         <span class="results-run-id" id="runIdLabel"></span>
       </div>
-      <div class="results-grid" style="grid-template-columns:1fr 1fr 1fr">
+      <div class="results-grid">
         <div class="results-col res-accepted">
           <div class="res-group-label">✓ Accepted Entities</div>
           <div id="acceptedList"></div>
-        </div>
-        <div class="results-col res-conflict">
-          <div class="res-group-label">⚡ Conflict Entities</div>
-          <div class="res-group-sub" style="font-family:var(--mono);font-size:9px;color:var(--light);margin-bottom:12px;">In graph · Pending master data</div>
-          <div id="conflictList"></div>
         </div>
         <div class="results-col res-quarantine">
           <div class="res-group-label">⊘ Quarantined Entities</div>
@@ -626,7 +619,6 @@ footer{background:var(--charcoal);padding:64px 60px;display:flex;justify-content
       </div>
       <div class="results-footer">
         <div class="res-stat"><div class="res-stat-n" id="rAccepted">-</div><div class="res-stat-l">Accepted</div></div>
-        <div class="res-stat"><div class="res-stat-n" id="rConflict">-</div><div class="res-stat-l">Conflicts</div></div>
         <div class="res-stat"><div class="res-stat-n" id="rQuarantine">-</div><div class="res-stat-l">Quarantined</div></div>
         <div class="res-stat"><div class="res-stat-n" id="rLoops">-</div><div class="res-stat-l">Loops Used</div></div>
       </div>
@@ -963,8 +955,15 @@ function addLog(html,cls=''){
 
 /* ── BACKEND API CALL ── */
 /* ── BACKEND API CALL → POST /resolve ── */
+/* ── BACKEND URL: auto-detects local vs deployed ── */
+const BACKEND_URL = (
+  window.location.hostname === 'localhost' ||
+  window.location.hostname === '127.0.0.1'
+) ? 'http://localhost:8000/resolve'
+  : 'https://btp-nexus-production.up.railway.app/resolve';
+
 async function callBackend(text) {
-  const res = await fetch('http://localhost:8000/resolve', {
+  const res = await fetch(BACKEND_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ text, artifact_id: null }),
@@ -997,8 +996,6 @@ async function runDemo(){
   // STAGE 1 — EXTRACTOR
   document.getElementById('stg-1').className='stg active';
   addLog('<span class="l-gold">[EXTRACTOR]</span> Sending to backend — <span class="l-blue">llama-3.3-70b-versatile via Groq</span>...','');
-  addLog('<span class="l-dim">[COREF]</span>     Resolving coreferences and normalising amounts...','');
-  addLog('<span class="l-dim">[CRITIQUE]</span>  Self-reviewing extraction for missed entities...','');
 
   // STAGE 2 — RESOLVER (both run server-side; animate stages while waiting)
   document.getElementById('stg-2').className='stg active';
@@ -1019,8 +1016,6 @@ async function runDemo(){
   // Unpack response from /resolve
   const accepted    = (result.accepted_entities   || []).map(e => ({ ...e, name: e.raw_name || e.canonical_id || JSON.stringify(e), type: e.entity_type || e.type || 'Entity', tier: 'ACCEPTED' }));
   const quarantined = (result.quarantined_entities || []).map(e => ({ ...e, name: e.raw_name || e.canonical_id || JSON.stringify(e), type: e.entity_type || e.type || 'Entity', tier: 'QUARANTINE' }));
-  const conflicts   = (result.conflict_entities   || []).map(e => ({ ...e, name: e.raw_name || e.canonical_id || JSON.stringify(e), type: e.entity_type || e.type || 'Entity', tier: 'CONFLICT' }));
-  const relationships = result.relationships || [];
   const loopCount   = result.resolver_loops_used || 1;
   const runId       = result.mlflow_run_id || Math.random().toString(16).slice(2,18);
   const graphStatus = result.graph_write_status || '';
@@ -1059,44 +1054,25 @@ async function runDemo(){
   addLog(`<span class="l-gold">[GRAPH]</span>     <span class="l-green">${graphStatus||'SUCCESS: wrote '+accepted.length+' nodes'}</span>`,'');
   document.getElementById('stg-3').className='stg done';
 
-  // Log LLM-extracted relationships
-  if(relationships.length > 0){
-    await sleep(150);
-    addLog(`<span class="l-gold">[RELATIONS]</span> <span class="l-green">${relationships.length} evidence-backed relationship(s) extracted</span>`,'');
-    for(const r of relationships){
-      await sleep(40);
-      addLog(`  <span class="l-dim">${r.source}</span> <span class="l-gold">─[${r.type}]→</span> <span class="l-dim">${r.target}</span>`,'');
-    }
-  } else {
-    addLog(`<span class="l-gold">[RELATIONS]</span> <span class="l-red">No explicit relationships found in text — check console for debug info</span>`,'');
-  }
-
   await sleep(150);
   addLog('','');
   addLog(`<span class="l-dim">graph_write_status:</span> <span class="l-green">${graphStatus}</span>`,'');
   addLog(`<span class="l-dim">mlflow_run_id     :</span> <span class="l-gold">${runId}</span>`,'');
   addLog(`<span class="l-dim">resolver_loops    :</span> <span class="l-white">${loopCount}</span>`,'');
-  if(result.coref_text && result.coref_text !== text){
-    addLog('','');
-    addLog('<span class="l-gold">[COREF]</span>     Normalised text:','');
-    addLog(`  <span class="l-dim">${result.coref_text.slice(0,200)}</span>`,'');
-  }
 
-  showResults(accepted, quarantined, conflicts, runId, loopCount, relationships);
+  showResults(accepted, quarantined, runId, loopCount);
   btn.disabled=false; btn.textContent='▶  RUN AGAIN';
 }
 
-function showResults(accepted, quarantined, conflicts, runId, loops, relationships){
+function showResults(accepted, quarantined, runId, loops){
   document.getElementById('runIdLabel').textContent='Run: '+runId.slice(0,12)+'...';
   const aList=document.getElementById('acceptedList');
   const qList=document.getElementById('quarantineList');
   aList.innerHTML='';qList.innerHTML='';
-  const cList=document.getElementById('conflictList');
-  if(cList) cList.innerHTML='';
 
   const TYPE_LABELS = {
     Person:'👤',Product:'📦',Project:'🗂️',Budget:'💰',
-    Organization:'🏢',Organisation:'🏢',Technology:'⚙️',Condition:'🔒',Entity:'◈'
+    Organization:'🏢',Organisation:'🏢',Technology:'⚙️',Entity:'◈'
   };
 
   accepted.forEach((e,i)=>{
@@ -1107,20 +1083,6 @@ function showResults(accepted, quarantined, conflicts, runId, loops, relationshi
     d.innerHTML=`<span class="entity-name" title="${typeStr}">${icon} ${e.name}</span><div class="entity-bar-wrap"><div class="entity-bar entity-bar-accepted" data-w="${pct}"></div></div><span class="entity-pct">${pct}%</span>`;
     aList.appendChild(d);
   });
-  // Render conflict entities
-  if(cList){
-    conflicts.forEach((e,i)=>{
-      const pct=Math.round((e.confidence||0)*100);
-      const pctLabel=pct>0?pct+'%':'–';
-      const barW=pct>0?pct:2;
-      const icon=TYPE_LABELS[e.entity_type||e.type]||'◈';
-      const typeStr=e.entity_type||e.type||'Entity';
-      const d=document.createElement('div');d.className='entity-row';d.style.animationDelay=(i*.07)+'s';
-      d.innerHTML=`<span class="entity-name" title="${typeStr} — pending master data">${icon} ${e.name}</span><div class="entity-bar-wrap"><div class="entity-bar entity-bar-conflict" data-w="${barW}"></div></div><span class="entity-pct" style="color:#8B6914">${pctLabel}</span>`;
-      cList.appendChild(d);
-    });
-  }
-
   quarantined.forEach((e,i)=>{
     const pct=Math.round((e.confidence||0)*100);
     const pctLabel=pct>0?pct+'%':'0%';
@@ -1133,8 +1095,6 @@ function showResults(accepted, quarantined, conflicts, runId, loops, relationshi
   });
 
   document.getElementById('rAccepted').textContent=accepted.length;
-  const rConflict=document.getElementById('rConflict');
-  if(rConflict) rConflict.textContent=conflicts.length;
   document.getElementById('rQuarantine').textContent=quarantined.length;
   document.getElementById('rLoops').textContent=loops||1;
   document.getElementById('resultsPanel').classList.add('show');
@@ -1144,7 +1104,7 @@ function showResults(accepted, quarantined, conflicts, runId, loops, relationshi
   updateSliders(accepted);
 
   // Live-update the knowledge graph with real entities from this run
-  updateKG(accepted, quarantined, conflicts, relationships);
+  updateKG(accepted, quarantined);
 }
 
 /* ── UPDATE SLIDERS from pipeline run ── */
@@ -1218,7 +1178,6 @@ const TYPE_COLORS = {
   'Cost Centre':'#7B6226', 'cost centre':'#7B6226',
   CostCentre:'#7B6226', costcentre:'#7B6226',
   Amount:'#7B6226', amount:'#7B6226',
-  Condition:'#6B3A2A', condition:'#6B3A2A',  // dark terracotta — gates/clearances
   default:'#6B6560'
 };
 
@@ -1239,7 +1198,6 @@ function typeColor(rawType) {
   if(lower.includes('product')||lower.includes('tech')||lower.includes('platform')||lower.includes('service')||lower.includes('system')||lower.includes('software')||lower.includes('cloud')) return TYPE_COLORS.Product;
   if(lower.includes('budget')||lower.includes('cost')||lower.includes('fund')||lower.includes('amount')||lower.includes('finance')||lower.includes('fiscal')) return TYPE_COLORS.Budget;
   if(lower.includes('org')||lower.includes('company')||lower.includes('corp')||lower.includes('dept')||lower.includes('division')||lower.includes('unit')) return TYPE_COLORS.Organisation;
-  if(lower.includes('condition')||lower.includes('clearance')||lower.includes('gate')||lower.includes('prerequisite')) return TYPE_COLORS.Condition;
   return TYPE_COLORS.default;
 }
 
@@ -1256,11 +1214,10 @@ function inferLabel(srcType, tgtType){
 }
 
 /* ── UPDATE KNOWLEDGE GRAPH from pipeline run ── */
-function updateKG(accepted, quarantined, conflicts, relationships){
+function updateKG(accepted, quarantined){
   if(!accepted.length && !quarantined.length) return;
 
-  // Include conflicts so nodes referenced by relationships exist in the graph
-  const allEntities = [...accepted, ...quarantined, ...conflicts];
+  const allEntities = [...accepted, ...quarantined];
   const nameIndex = {};
 
   // Normalise type so Organization/Organisation/organization all resolve the same
@@ -1273,7 +1230,6 @@ function updateKG(accepted, quarantined, conflicts, relationships){
     if(l==='product')  return 'Product';
     if(l==='budget')   return 'Budget';
     if(l==='technology') return 'Technology';
-    if(l==='condition') return 'Condition';
     return t;
   };
 
@@ -1294,41 +1250,46 @@ function updateKG(accepted, quarantined, conflicts, relationships){
     if(!edgeSeen.has(key)){edgeSeen.add(key);newEdges.push({a,b,lbl});}
   };
 
-  // ── Use ONLY LLM-extracted, evidence-backed relationships ──
-  // Fuzzy name resolver: handles casing differences and partial matches
-  // e.g. LLM returns "Project Orion" but nameIndex has "Orion-v2"
-  const resolveNodeId = (name) => {
-    if(!name) return null;
-    // 1. Exact match
-    if(nameIndex[name] != null) return nameIndex[name];
-    // 2. Case-insensitive exact
-    const lower = name.toLowerCase();
-    for(const [k,v] of Object.entries(nameIndex)){
-      if(k.toLowerCase() === lower) return v;
-    }
-    // 3. Substring — e.g. "Marco Rossi" contains "Marco"
-    for(const [k,v] of Object.entries(nameIndex)){
-      if(lower.includes(k.toLowerCase()) || k.toLowerCase().includes(lower)) return v;
-    }
-    return null;
-  };
+  // Bucket accepted entities by normalised type
+  const byType = t => accepted
+    .filter(e => normType(e.type||e.entity_type) === t)
+    .map(e => nameIndex[e.name])
+    .filter(i => i != null);
 
-  console.log('[BTP-Nexus] Relationships from API:', relationships);
-  console.log('[BTP-Nexus] nameIndex:', nameIndex);
+  const people   = byType('Person');
+  const projects = byType('Project');
+  const products = byType('Product').concat(byType('Technology'));
+  const budgets  = byType('Budget');
+  const orgs     = byType('Organisation');
 
-  (relationships || []).forEach(rel => {
-    const a = resolveNodeId(rel.source);
-    const b = resolveNodeId(rel.target);
-    console.log(`  rel: "${rel.source}" (→${a}) --[${rel.type}]--> "${rel.target}" (→${b})  evidence: "${rel.evidence}"`);
-    if(a != null && b != null) addEdge(a, b, rel.type);
-    else console.warn(`  ⚠ dropped — could not resolve node IDs`);
-  });
+  // Person → Project  (LEADS)
+  people.forEach(p => projects.forEach(pr => addEdge(p, pr, 'LEADS')));
 
-  // Fallback: only if API returned zero relationships
-  if(newEdges.length === 0){
-    console.warn('[BTP-Nexus] No verified relationships found — drawing UNVERIFIED fallback chain.');
+  // Person → Organisation  (MEMBER_OF)
+  people.forEach(p => orgs.forEach(o => addEdge(p, o, 'MEMBER_OF')));
+
+  // Person → Budget  (MANAGES) — first budget only per person to avoid clutter
+  people.forEach(p => budgets.slice(0,1).forEach(b => addEdge(p, b, 'MANAGES')));
+
+  // Project → Budget  (HAS_BUDGET) — all budgets
+  projects.forEach(pr => budgets.forEach(b => addEdge(pr, b, 'HAS_BUDGET')));
+
+  // Project → Product  (RUNS_ON)
+  projects.forEach(pr => products.slice(0,2).forEach(pd => addEdge(pr, pd, 'RUNS_ON')));
+
+  // Organisation → Project  (APPROVES)
+  orgs.forEach(o => projects.forEach(pr => addEdge(o, pr, 'APPROVES')));
+
+  // Organisation → Product  (OWNS)
+  orgs.forEach(o => products.slice(0,2).forEach(pd => addEdge(o, pd, 'OWNS')));
+
+  // Product → Product  (INTEGRATES)
+  if(products.length>1) addEdge(products[0], products[1], 'INTEGRATES');
+
+  // Fallback: if still no edges, chain all accepted nodes sequentially
+  if(newEdges.length===0){
     const ids = accepted.map(e=>nameIndex[e.name]).filter(i=>i!=null);
-    for(let i=0;i<ids.length-1;i++) addEdge(ids[i],ids[i+1],'UNVERIFIED');
+    for(let i=0;i<ids.length-1;i++) addEdge(ids[i],ids[i+1],'LINKED_TO');
   }
 
   // Position nodes in a circle
@@ -1468,13 +1429,13 @@ function kgAnim(){
     const a=nodes[e.a],b=nodes[e.b];
     const dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy);
     const hi=hov&&(hov.id===e.a||hov.id===e.b);
-    kctx.strokeStyle=hi?'rgba(184,150,90,.85)':'rgba(100,85,65,.55)';
-    kctx.lineWidth=hi?1.8:1.2;
+    kctx.strokeStyle=hi?'rgba(184,150,90,.7)':'rgba(200,190,175,.35)';
+    kctx.lineWidth=hi?1.5:1;
     kctx.beginPath();kctx.moveTo(a.x,a.y);kctx.lineTo(b.x,b.y);kctx.stroke();
     // arrowhead
     const mx2=a.x+dx*.6,my2=a.y+dy*.6,nx=-dy/d,ny=dx/d;
     kctx.beginPath();kctx.moveTo(mx2+nx*5,my2+ny*5);kctx.lineTo(mx2+dx/d*10,my2+dy/d*10);kctx.lineTo(mx2-nx*5,my2-ny*5);
-    kctx.fillStyle=hi?'rgba(184,150,90,.85)':'rgba(100,85,65,.55)';kctx.fill();
+    kctx.fillStyle=hi?'rgba(184,150,90,.7)':'rgba(200,190,175,.35)';kctx.fill();
     if(hi){kctx.font='10px DM Mono,monospace';kctx.fillStyle='rgba(184,150,90,.9)';kctx.textAlign='center';kctx.fillText(e.lbl,a.x+dx*.45,a.y+dy*.45-10);}
   });
 
