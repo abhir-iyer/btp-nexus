@@ -45,13 +45,11 @@ class ArtifactRequest(BaseModel):
 class ArtifactResponse(BaseModel):
     artifact_id: str
     accepted_entities: list
+    conflict_entities: list       # resolved but below acceptance threshold after max loops
     quarantined_entities: list
-    conflict_entities: list
-    relationships: list
     graph_write_status: str
     resolver_loops_used: int
     mlflow_run_id: Optional[str]
-    coref_text: Optional[str] = None   # coreference-resolved text for debugging
 
 # ── Routes ─────────────────────────────────────────────────────────────────
 @app.get("/")
@@ -76,12 +74,6 @@ def health():
 def resolve(req: ArtifactRequest):
     """
     Run the full BTP-Nexus agentic pipeline on a text artifact.
-
-    - De-noises and normalises the raw text
-    - Extracts business entities via fine-tuned LLM
-    - Resolves entities against the Master Data Graph (Neo4j)
-    - Applies 70/30 Consensus Logic with autonomous loop-back
-    - Writes reconciled entities to the Knowledge Graph
     """
     if not req.text or len(req.text.strip()) < 10:
         raise HTTPException(status_code=400, detail="Text is too short to process.")
@@ -94,13 +86,11 @@ def resolve(req: ArtifactRequest):
     return ArtifactResponse(
         artifact_id=result.artifact_id,
         accepted_entities=result.resolved_entities,
+        conflict_entities=result.conflict_entities,
         quarantined_entities=result.quarantined_entities,
-        conflict_entities=result.extracted_entities,
-        relationships=result.extracted_relationships,
         graph_write_status=result.graph_write_status,
         resolver_loops_used=result.resolver_loop_count,
         mlflow_run_id=result.mlflow_run_id,
-        coref_text=result.coref_text,
     )
 
 # ── Run directly ───────────────────────────────────────────────────────────
