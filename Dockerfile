@@ -6,7 +6,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY nexus_pipeline.py .
-COPY main.py .
+COPY api/main.py .
 
 EXPOSE 8000
 
