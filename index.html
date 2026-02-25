@@ -249,14 +249,12 @@ textarea.demo-ta:focus{border-color:var(--gold);}
 .results-head{padding:16px 28px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;}
 .results-head-label{font-family:var(--mono);font-size:10px;color:var(--light);letter-spacing:2px;text-transform:uppercase;}
 .results-run-id{font-family:var(--mono);font-size:10px;color:var(--gold);}
-.results-grid{display:grid;grid-template-columns:1fr 1fr 1fr;border-bottom:1px solid var(--border);}
+.results-grid{display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid var(--border);}
 .results-col{padding:24px 28px;}
 .results-col+.results-col{border-left:1px solid var(--border);}
 .res-group-label{font-family:var(--mono);font-size:10px;letter-spacing:2px;text-transform:uppercase;margin-bottom:16px;padding-bottom:8px;border-bottom:1px solid var(--border);}
 .res-accepted .res-group-label{color:var(--forest);}
-.res-conflict .res-group-label{color:#C8922A;}
 .res-quarantine .res-group-label{color:#C0543F;}
-.entity-bar-conflict{background:linear-gradient(90deg,#C8922A,#E0A830);}
 .entity-row{padding:10px 0;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;animation:fadeInUp .3s ease both;}
 .entity-row:last-child{border-bottom:none;}
 .entity-name{font-family:var(--mono);font-size:11px;color:var(--charcoal);flex-shrink:0;min-width:120px;}
@@ -614,10 +612,6 @@ footer{background:var(--charcoal);padding:64px 60px;display:flex;justify-content
           <div class="res-group-label">✓ Accepted Entities</div>
           <div id="acceptedList"></div>
         </div>
-        <div class="results-col res-conflict">
-          <div class="res-group-label">⚠ Conflict Entities</div>
-          <div id="conflictList"></div>
-        </div>
         <div class="results-col res-quarantine">
           <div class="res-group-label">⊘ Quarantined Entities</div>
           <div id="quarantineList"></div>
@@ -625,7 +619,6 @@ footer{background:var(--charcoal);padding:64px 60px;display:flex;justify-content
       </div>
       <div class="results-footer">
         <div class="res-stat"><div class="res-stat-n" id="rAccepted">-</div><div class="res-stat-l">Accepted</div></div>
-        <div class="res-stat"><div class="res-stat-n" id="rConflict">-</div><div class="res-stat-l">Conflict</div></div>
         <div class="res-stat"><div class="res-stat-n" id="rQuarantine">-</div><div class="res-stat-l">Quarantined</div></div>
         <div class="res-stat"><div class="res-stat-n" id="rLoops">-</div><div class="res-stat-l">Loops Used</div></div>
       </div>
@@ -1022,14 +1015,13 @@ async function runDemo(){
 
   // Unpack response from /resolve
   const accepted    = (result.accepted_entities   || []).map(e => ({ ...e, name: e.raw_name || e.canonical_id || JSON.stringify(e), type: e.entity_type || e.type || 'Entity', tier: 'ACCEPTED' }));
-  const conflicts   = (result.conflict_entities   || []).map(e => ({ ...e, name: e.raw_name || e.canonical_id || JSON.stringify(e), type: e.entity_type || e.type || 'Entity', tier: 'CONFLICT' }));
   const quarantined = (result.quarantined_entities || []).map(e => ({ ...e, name: e.raw_name || e.canonical_id || JSON.stringify(e), type: e.entity_type || e.type || 'Entity', tier: 'QUARANTINE' }));
   const loopCount   = result.resolver_loops_used || 1;
   const runId       = result.mlflow_run_id || Math.random().toString(16).slice(2,18);
   const graphStatus = result.graph_write_status || '';
 
   // Log extractor results
-  const totalEntities = accepted.length + conflicts.length + quarantined.length;
+  const totalEntities = accepted.length + quarantined.length;
   document.getElementById('stg-1').className='stg done';
   document.getElementById('conn-1').classList.add('lit');
   addLog(`<span class="l-gold">[EXTRACTOR]</span> <span class="l-green">Found ${totalEntities} entities</span>`,'');
@@ -1040,18 +1032,13 @@ async function runDemo(){
     const conf = Math.round((e.confidence||0)*100);
     addLog(`  <span class="l-green">✓</span> <span class="l-white">${e.name}</span> → <span class="l-dim">${e.canonical_id||'MDG-AUTO'}</span> <span class="l-green">${conf}%</span>`,'');
   }
-  for(const e of conflicts){
-    await sleep(60);
-    const conf = Math.round((e.confidence||0)*100);
-    addLog(`  <span class="l-amber">⚠</span> <span class="l-white">${e.name}</span> → conflict <span class="l-amber">${conf}%</span>`,'');
-  }
   for(const e of quarantined){
     await sleep(60);
     const conf = Math.round((e.confidence||0)*100);
     addLog(`  <span class="l-red">⊘</span> <span class="l-white">${e.name}</span> → quarantined <span class="l-red">${conf}%</span>`,'');
   }
 
-  addLog(`<span class="l-gold">[RESOLVER]</span>  Done — Accepted <span class="l-green">${accepted.length}</span> · Conflict <span class="l-amber">${conflicts.length}</span> · Quarantined <span class="l-red">${quarantined.length}</span> · Loops <span class="l-white">${loopCount}</span>`,'');
+  addLog(`<span class="l-gold">[RESOLVER]</span>  Done — Accepted <span class="l-green">${accepted.length}</span> · Quarantined <span class="l-red">${quarantined.length}</span> · Loops <span class="l-white">${loopCount}</span>`,'');
   document.getElementById('stg-2').className='stg done';
   document.getElementById('conn-2').classList.add('lit');
   await sleep(200);
@@ -1073,44 +1060,43 @@ async function runDemo(){
   addLog(`<span class="l-dim">mlflow_run_id     :</span> <span class="l-gold">${runId}</span>`,'');
   addLog(`<span class="l-dim">resolver_loops    :</span> <span class="l-white">${loopCount}</span>`,'');
 
-  showResults(accepted, conflicts, quarantined, runId, loopCount);
-  updateSliders(accepted);
-  updateKG(accepted, conflicts, quarantined);
+  showResults(accepted, quarantined, runId, loopCount);
   btn.disabled=false; btn.textContent='▶  RUN AGAIN';
 }
 
-function showResults(accepted, conflicts, quarantined, runId, loops){
+function showResults(accepted, quarantined, runId, loops){
   document.getElementById('runIdLabel').textContent='Run: '+runId.slice(0,12)+'...';
   const aList=document.getElementById('acceptedList');
-  const cList=document.getElementById('conflictList');
   const qList=document.getElementById('quarantineList');
-  aList.innerHTML='';cList.innerHTML='';qList.innerHTML='';
+  aList.innerHTML='';qList.innerHTML='';
 
   const TYPE_LABELS = {
     Person:'👤',Product:'📦',Project:'🗂️',Budget:'💰',
     Organization:'🏢',Organisation:'🏢',Technology:'⚙️',Entity:'◈'
   };
 
-  const makeRow = (e, i, cls, barCls) => {
-    const pct = Math.round((e.confidence||0)*100);
-    const barW = pct > 0 ? pct : 2;
-    const icon = TYPE_LABELS[e.entity_type||e.type]||'◈';
-    const typeStr = e.entity_type||e.type||'Entity';
-    const d = document.createElement('div');
-    d.className=`entity-row ${cls}`;
-    d.style.animationDelay=(i*.07)+'s';
-    d.innerHTML=`<span class="entity-name" title="${typeStr}">${icon} ${e.name}</span><div class="entity-bar-wrap"><div class="entity-bar ${barCls}" data-w="${barW}"></div></div><span class="entity-pct">${pct}%</span>`;
-    return d;
-  };
+  accepted.forEach((e,i)=>{
+    const pct=Math.round((e.confidence||0)*100);
+    const icon=TYPE_LABELS[e.entity_type||e.type]||'◈';
+    const typeStr=e.entity_type||e.type||'Entity';
+    const d=document.createElement('div');d.className='entity-row accepted';d.style.animationDelay=(i*.07)+'s';
+    d.innerHTML=`<span class="entity-name" title="${typeStr}">${icon} ${e.name}</span><div class="entity-bar-wrap"><div class="entity-bar entity-bar-accepted" data-w="${pct}"></div></div><span class="entity-pct">${pct}%</span>`;
+    aList.appendChild(d);
+  });
+  quarantined.forEach((e,i)=>{
+    const pct=Math.round((e.confidence||0)*100);
+    const pctLabel=pct>0?pct+'%':'0%';
+    const barW=pct>0?pct:2;
+    const icon=TYPE_LABELS[e.entity_type||e.type]||'◈';
+    const typeStr=e.entity_type||e.type||'Entity';
+    const d=document.createElement('div');d.className='entity-row quarantine';d.style.animationDelay=((accepted.length+i)*.07)+'s';
+    d.innerHTML=`<span class="entity-name" title="${typeStr}">${icon} ${e.name}</span><div class="entity-bar-wrap"><div class="entity-bar entity-bar-q" data-w="${barW}"></div></div><span class="entity-pct">${pctLabel}</span>`;
+    qList.appendChild(d);
+  });
 
-  accepted.forEach((e,i)   => aList.appendChild(makeRow(e, i,                        'accepted',  'entity-bar-accepted')));
-  conflicts.forEach((e,i)  => cList.appendChild(makeRow(e, accepted.length+i,        'conflict',  'entity-bar-conflict')));
-  quarantined.forEach((e,i)=> qList.appendChild(makeRow(e, accepted.length+conflicts.length+i, 'quarantine', 'entity-bar-q')));
-
-  document.getElementById('rAccepted').textContent  = accepted.length;
-  document.getElementById('rConflict').textContent  = conflicts.length;
-  document.getElementById('rQuarantine').textContent= quarantined.length;
-  document.getElementById('rLoops').textContent     = loops||1;
+  document.getElementById('rAccepted').textContent=accepted.length;
+  document.getElementById('rQuarantine').textContent=quarantined.length;
+  document.getElementById('rLoops').textContent=loops||1;
   document.getElementById('resultsPanel').classList.add('show');
   setTimeout(()=>{document.querySelectorAll('.entity-bar').forEach(b=>{b.style.width=b.dataset.w+'%';});},300);
 
@@ -1228,11 +1214,10 @@ function inferLabel(srcType, tgtType){
 }
 
 /* ── UPDATE KNOWLEDGE GRAPH from pipeline run ── */
-function updateKG(accepted, conflicts, quarantined){
-  conflicts = conflicts || [];
-  if(!accepted.length && !conflicts.length && !quarantined.length) return;
+function updateKG(accepted, quarantined){
+  if(!accepted.length && !quarantined.length) return;
 
-  const allEntities = [...accepted, ...conflicts, ...quarantined];
+  const allEntities = [...accepted, ...quarantined];
   const nameIndex = {};
 
   // Normalise type so Organization/Organisation/organization all resolve the same
