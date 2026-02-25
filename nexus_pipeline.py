@@ -395,10 +395,21 @@ def node_resolver(state: NexusState, config: RunnableConfig) -> dict:
         len(accepted), len(conflicts), len(quarantined),
     )
 
+    # If this is the final loop, move remaining conflicts to conflict_entities
+    # so they're surfaced in the API response rather than silently dropped
+    is_final_loop = (state.resolver_loop_count + 1) >= state.max_resolver_loops
+    final_conflicts = []
+    if is_final_loop and conflicts:
+        for ent in conflicts:
+            ent["tier"] = ConfidenceTier.CONFLICT
+        final_conflicts = conflicts
+        conflicts = []  # clear so router sees no extracted_entities → proceeds to graph_architect
+
     return {
         "resolved_entities": accepted,
         "extracted_entities": conflicts,
         "quarantined_entities": state.quarantined_entities + quarantined,
+        "conflict_entities": state.conflict_entities + final_conflicts,
         "resolver_loop_count": state.resolver_loop_count + 1,
     }
 
@@ -455,33 +466,24 @@ def node_graph_architect(state: NexusState, config: RunnableConfig) -> dict:
 
 def route_resolver(state: NexusState) -> str:
     """
-    Consensus Logic Router.
-    - Still have conflicts AND loops remaining → re-run resolver
+    Consensus Logic Router — pure routing only, no state mutation.
+    - Conflicts remain AND loops left → re-run resolver
     - Max loops hit OR no conflicts → proceed to Graph Architect
-    - All entities quarantined → end with quarantine warning
+    - Nothing accepted → end
     """
-    has_conflicts = len(state.extracted_entities) > 0
+    has_conflicts  = len(state.extracted_entities) > 0
     loop_exhausted = state.resolver_loop_count >= state.max_resolver_loops
-    has_accepted = len(state.resolved_entities) > 0
+    has_accepted   = len(state.resolved_entities) > 0
 
     if has_conflicts and not loop_exhausted:
-        logger.info("[Router] Conflicts remain. Looping back to resolver (loop %d).", state.resolver_loop_count)
+        logger.info("[Router] Conflicts remain. Looping back (loop %d).", state.resolver_loop_count)
         return "resolver"
-
-    # Loop exhausted — any remaining extracted_entities are unresolved conflicts
-    if has_conflicts and loop_exhausted:
-        # Mark them explicitly as CONFLICT tier so the API can surface them
-        for ent in state.extracted_entities:
-            ent["tier"] = ConfidenceTier.CONFLICT
-        state.conflict_entities = state.extracted_entities[:]
-        state.extracted_entities = []
-        logger.warning("[Router] Loop limit reached. %d entities remain as CONFLICT.", len(state.conflict_entities))
 
     if has_accepted:
         logger.info("[Router] Routing to Graph Architect.")
         return "graph_architect"
 
-    logger.warning("[Router] No accepted entities. Ending pipeline — all quarantined.")
+    logger.warning("[Router] No accepted entities. Ending pipeline.")
     return END
 
 
