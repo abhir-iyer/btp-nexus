@@ -1,0 +1,1511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>BTP-Nexus - Agentic Entity-Resolution Service</title>
+<!-- Luxury SVG favicon: gold diamond monogram -->
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%23F7F3EE'/%3E%3Cpolygon points='32,4 60,32 32,60 4,32' fill='none' stroke='%23B8965A' stroke-width='3'/%3E%3Cpolygon points='32,12 52,32 32,52 12,32' fill='%23B8965A' opacity='.15'/%3E%3Ctext x='32' y='38' font-family='Georgia,serif' font-size='18' font-weight='700' font-style='italic' fill='%23B8965A' text-anchor='middle'%3EN%3C/text%3E%3C/svg%3E"/>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;0,900;1,400;1,600&family=Cormorant:ital,wght@0,300;0,400;0,600;1,300;1,400&family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&display=swap" rel="stylesheet"/>
+<style>
+:root{
+  --cream:#F7F3EE;
+  --ivory:#FDFAF7;
+  --white:#FFFFFF;
+  --gold:#B8965A;
+  --gold-light:#D4B483;
+  --gold-pale:#EFE4CC;
+  --forest:#1E3A2F;
+  --charcoal:#1C1C1E;
+  --ink:#2D2D2D;
+  --mid:#6B6560;
+  --light:#9C9490;
+  --hairline:#DDD7CF;
+  --border:#E8E1D6;
+
+  --serif:'Playfair Display',Georgia,serif;
+  --italic:'Cormorant',Georgia,serif;
+  --mono:'DM Mono',monospace;
+
+  --shadow-sm:0 1px 4px rgba(0,0,0,.06);
+  --shadow:0 4px 24px rgba(0,0,0,.08);
+  --shadow-lg:0 12px 60px rgba(0,0,0,.12);
+}
+
+*{margin:0;padding:0;box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{
+  background:var(--cream);
+  color:var(--ink);
+  font-family:var(--serif);
+  overflow-x:hidden;
+}
+
+/* grain texture overlay */
+body::before{
+  content:'';position:fixed;inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='400' height='400' filter='url(%23n)' opacity='.03'/%3E%3C/svg%3E");
+  pointer-events:none;z-index:9998;opacity:.6;
+}
+
+/* Scroll-to-top */
+#scrollTop{position:fixed;bottom:36px;right:36px;z-index:200;width:48px;height:48px;background:var(--charcoal);border:1px solid var(--gold);display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:0;transform:translateY(16px);transition:opacity .4s,transform .4s,background .2s;box-shadow:0 4px 20px rgba(0,0,0,.18);}
+#scrollTop.visible{opacity:1;transform:translateY(0);}
+#scrollTop:hover{background:var(--gold);}
+#scrollTop:hover .stt-icon{border-color:var(--charcoal);}
+.stt-icon{width:10px;height:10px;border-top:2px solid var(--gold-light);border-right:2px solid var(--gold-light);transform:rotate(-45deg) translate(1px,2px);transition:border-color .2s;}
+
+/* NAV */
+nav{
+  position:fixed;top:0;left:0;right:0;z-index:100;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:20px 60px;
+  background:rgba(247,243,238,.94);
+  backdrop-filter:blur(16px);
+  border-bottom:1px solid var(--hairline);
+  transition:padding .3s;
+}
+nav.scrolled{padding:14px 60px;}
+.nav-logo{font-family:var(--serif);font-size:18px;font-weight:700;color:var(--charcoal);letter-spacing:-.3px;}
+.nav-logo em{font-style:italic;color:var(--gold);}
+.nav-links{display:flex;gap:36px;list-style:none;}
+.nav-links a{font-family:var(--mono);font-size:11px;color:var(--mid);text-decoration:none;letter-spacing:1.5px;text-transform:uppercase;transition:color .2s;position:relative;padding-bottom:2px;}
+.nav-links a::after{content:'';position:absolute;bottom:0;left:0;width:0;height:1px;background:var(--gold);transition:width .25s;}
+.nav-links a:hover{color:var(--charcoal);}
+.nav-links a:hover::after{width:100%;}
+.nav-pill{font-family:var(--mono);font-size:10px;color:var(--gold);border:1px solid var(--gold-light);padding:6px 14px;letter-spacing:1px;background:var(--gold-pale);white-space:nowrap;}
+
+.hamburger{display:none;flex-direction:column;gap:6px;cursor:pointer;background:none;border:none;padding:4px;}
+.hamburger span{display:block;width:24px;height:1px;background:var(--ink);transition:all .3s;}
+.mobile-nav{display:none;position:fixed;top:65px;left:0;right:0;background:rgba(247,243,238,.98);border-bottom:1px solid var(--hairline);padding:20px 32px;z-index:99;flex-direction:column;}
+.mobile-nav.open{display:flex;}
+.mobile-nav a{font-family:var(--mono);font-size:11px;color:var(--mid);text-decoration:none;letter-spacing:2px;text-transform:uppercase;padding:16px 0;border-bottom:1px solid var(--border);}
+
+/* DIVIDERS */
+.rule{width:100%;height:1px;background:var(--hairline);}
+.rule-gold{width:48px;height:1px;background:var(--gold);margin-bottom:28px;}
+.rule-full-gold{width:100%;height:1px;background:linear-gradient(90deg,var(--gold-light),transparent);}
+
+/* HERO */
+.hero{
+  min-height:100vh;display:flex;align-items:flex-end;
+  padding:140px 60px 80px;
+  position:relative;overflow:hidden;
+  background:var(--ivory);
+}
+.hero-bg-text{
+  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  font-family:var(--serif);font-size:clamp(120px,20vw,280px);font-weight:900;
+  color:rgba(184,150,90,.05);letter-spacing:-8px;white-space:nowrap;
+  pointer-events:none;user-select:none;
+  animation:bgDrift 20s ease-in-out infinite;
+}
+@keyframes bgDrift{0%,100%{transform:translate(-50%,-50%) skewX(-1deg);}50%{transform:translate(-50%,-51%) skewX(1deg);}}
+
+.hero-label{
+  position:absolute;top:140px;left:60px;
+  font-family:var(--mono);font-size:10px;color:var(--light);letter-spacing:3px;text-transform:uppercase;
+  writing-mode:vertical-rl;transform:rotate(180deg);
+  animation:fadeInUp .8s ease both;
+}
+.hero-number{
+  position:absolute;top:140px;right:60px;
+  font-family:var(--mono);font-size:10px;color:var(--light);letter-spacing:2px;
+  animation:fadeInUp .8s ease .2s both;
+}
+
+.hero-content{position:relative;max-width:1100px;width:100%;}
+.hero-eyebrow{
+  font-family:var(--mono);font-size:11px;color:var(--gold);
+  letter-spacing:3px;text-transform:uppercase;margin-bottom:28px;
+  display:flex;align-items:center;gap:16px;
+  animation:fadeInUp .8s ease .1s both;
+}
+.hero-eyebrow::before{content:'';width:40px;height:1px;background:var(--gold);}
+
+h1{
+  font-size:clamp(56px,10vw,130px);font-weight:900;line-height:.95;
+  letter-spacing:-3px;color:var(--charcoal);margin-bottom:32px;
+  animation:fadeInUp .8s ease .2s both;
+}
+h1 em{font-style:italic;color:var(--gold);font-weight:600;}
+h1 .sub{display:block;font-size:clamp(28px,4vw,60px);font-weight:400;font-style:italic;color:var(--mid);letter-spacing:-1px;}
+
+.hero-desc{
+  font-family:var(--italic);font-size:clamp(16px,2vw,22px);font-weight:300;
+  color:var(--mid);line-height:1.65;max-width:620px;margin-bottom:52px;
+  animation:fadeInUp .8s ease .3s both;
+}
+.hero-actions{display:flex;gap:16px;flex-wrap:wrap;animation:fadeInUp .8s ease .4s both;}
+.btn-gold{
+  font-family:var(--mono);font-size:11px;letter-spacing:2px;text-transform:uppercase;
+  padding:16px 36px;background:var(--charcoal);color:var(--cream);
+  border:none;cursor:pointer;text-decoration:none;display:inline-block;
+  position:relative;overflow:hidden;transition:transform .2s;
+}
+.btn-gold::before{content:'';position:absolute;inset:0;background:var(--gold);transform:translateX(-101%);transition:transform .3s ease;}
+.btn-gold:hover{transform:translateY(-2px);box-shadow:var(--shadow);}
+.btn-gold:hover::before{transform:translateX(0);}
+.btn-gold span{position:relative;z-index:1;}
+.btn-outline{
+  font-family:var(--mono);font-size:11px;letter-spacing:2px;text-transform:uppercase;
+  padding:15px 36px;background:transparent;color:var(--charcoal);
+  border:1px solid var(--charcoal);cursor:pointer;text-decoration:none;display:inline-block;
+  transition:all .2s;
+}
+.btn-outline:hover{background:var(--charcoal);color:var(--cream);transform:translateY(-2px);}
+
+/* live status */
+.live-chip{
+  position:absolute;bottom:80px;right:60px;
+  display:flex;align-items:center;gap:10px;
+  font-family:var(--mono);font-size:10px;color:var(--forest);
+  border:1px solid rgba(30,58,47,.2);background:rgba(30,58,47,.05);
+  padding:8px 16px;letter-spacing:1px;
+  animation:fadeInUp .8s ease .5s both;
+}
+.pulse-dot{width:6px;height:6px;border-radius:50%;background:var(--forest);animation:dot-pulse 2s ease infinite;}
+@keyframes dot-pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.4;transform:scale(.7);}}
+
+/* STATS STRIP */
+.stats-strip{
+  display:grid;grid-template-columns:repeat(4,1fr);
+  border-top:1px solid var(--border);background:var(--white);
+}
+.stat-block{padding:32px 40px;border-right:1px solid var(--border);transition:background .25s;}
+.stat-block:last-child{border-right:none;}
+.stat-block:hover{background:var(--gold-pale);}
+.stat-n{font-size:clamp(28px,4vw,48px);font-weight:700;color:var(--charcoal);letter-spacing:-1px;margin-bottom:4px;font-family:var(--serif);}
+.stat-n em{font-style:italic;color:var(--gold);}
+.stat-l{font-family:var(--mono);font-size:10px;color:var(--light);letter-spacing:2px;text-transform:uppercase;}
+
+/* SECTIONS */
+section{padding:100px 60px;position:relative;}
+.sec-header{display:flex;gap:60px;align-items:flex-start;margin-bottom:72px;}
+.sec-num{font-family:var(--mono);font-size:11px;color:var(--light);letter-spacing:2px;padding-top:6px;flex-shrink:0;}
+.sec-titles h2{font-size:clamp(32px,5vw,60px);font-weight:700;letter-spacing:-1px;color:var(--charcoal);line-height:1.05;margin-bottom:16px;}
+.sec-titles h2 em{font-style:italic;font-weight:400;color:var(--gold);}
+.sec-sub{font-family:var(--italic);font-size:18px;font-weight:300;color:var(--mid);line-height:1.6;max-width:520px;}
+
+/* INTERACTIVE DEMO */
+.demo-wrap{background:var(--white);border:1px solid var(--border);box-shadow:var(--shadow);}
+.demo-top{padding:36px 40px;border-bottom:1px solid var(--border);}
+.demo-field-label{font-family:var(--mono);font-size:10px;color:var(--light);letter-spacing:2px;text-transform:uppercase;margin-bottom:12px;}
+textarea.demo-ta{
+  width:100%;background:var(--cream);border:1px solid var(--border);
+  font-family:var(--mono);font-size:12px;color:var(--ink);
+  padding:18px 20px;resize:vertical;min-height:88px;outline:none;
+  transition:border-color .2s;line-height:1.7;
+}
+textarea.demo-ta:focus{border-color:var(--gold);}
+.presets{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;}
+.preset{
+  font-family:var(--mono);font-size:10px;color:var(--mid);
+  border:1px solid var(--border);background:var(--cream);
+  padding:6px 14px;cursor:pointer;letter-spacing:1px;transition:all .2s;
+}
+.preset:hover{background:var(--gold-pale);border-color:var(--gold);color:var(--charcoal);}
+
+/* stages */
+.stages{display:flex;align-items:center;padding:28px 40px;border-bottom:1px solid var(--border);background:var(--cream);gap:0;overflow-x:auto;}
+.stg{flex:1;min-width:110px;text-align:center;padding:16px 8px;position:relative;transition:all .35s;}
+.stg-icon{font-size:22px;display:block;margin-bottom:8px;}
+.stg-lbl{font-family:var(--mono);font-size:10px;color:var(--light);letter-spacing:1px;text-transform:uppercase;}
+.stg.active .stg-lbl{color:var(--gold);}
+.stg.done  .stg-lbl{color:var(--forest);}
+.stg-indicator{width:6px;height:6px;border-radius:50%;background:var(--border);margin:8px auto 0;transition:background .3s;}
+.stg.active .stg-indicator{background:var(--gold);animation:dot-pulse 1s ease infinite;}
+.stg.done   .stg-indicator{background:var(--forest);}
+.stg-conn{flex-shrink:0;flex:0 0 40px;height:1px;background:var(--border);transition:background .4s;align-self:center;margin-bottom:14px;}
+.stg-conn.lit{background:var(--gold);}
+
+/* run button */
+.run-btn{
+  width:100%;background:var(--charcoal);color:var(--cream);
+  font-family:var(--mono);font-size:12px;letter-spacing:3px;text-transform:uppercase;
+  padding:20px;border:none;cursor:pointer;
+  position:relative;overflow:hidden;transition:all .25s;
+  border-top:1px solid var(--border);
+}
+.run-btn::after{content:'';position:absolute;top:0;left:-100%;width:40%;height:100%;background:linear-gradient(90deg,transparent,rgba(184,150,90,.3),transparent);animation:sweep 2.5s ease infinite;}
+@keyframes sweep{0%{left:-100%;}100%{left:200%;}}
+.run-btn:hover{background:var(--gold);}
+.run-btn:disabled{background:var(--mid);cursor:not-allowed;}
+
+/* log */
+.log-panel{height:220px;overflow-y:auto;padding:20px 28px;background:var(--charcoal);font-family:var(--mono);font-size:11px;line-height:1.9;}
+.log-panel::-webkit-scrollbar{width:3px;}
+.log-panel::-webkit-scrollbar-thumb{background:var(--gold);}
+.log-item{animation:logSlide .25s ease both;}
+@keyframes logSlide{from{opacity:0;transform:translateX(-6px);}to{opacity:1;transform:translateX(0);}}
+.l-dim{color:rgba(253,250,247,.3);} .l-gold{color:var(--gold-light);}
+.l-green{color:#5EBF8A;} .l-red{color:#E07B6A;}
+.l-white{color:var(--ivory);} .l-blue{color:#7ABBDA;}
+.log-empty{color:rgba(253,250,247,.25);text-align:center;padding-top:70px;font-size:11px;letter-spacing:2px;}
+
+/* results */
+.results{display:none;background:var(--white);}
+.results.show{display:block;animation:fadeInUp .4s ease;}
+.results-head{padding:16px 28px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;}
+.results-head-label{font-family:var(--mono);font-size:10px;color:var(--light);letter-spacing:2px;text-transform:uppercase;}
+.results-run-id{font-family:var(--mono);font-size:10px;color:var(--gold);}
+.results-grid{display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid var(--border);}
+.results-col{padding:24px 28px;}
+.results-col+.results-col{border-left:1px solid var(--border);}
+.res-group-label{font-family:var(--mono);font-size:10px;letter-spacing:2px;text-transform:uppercase;margin-bottom:16px;padding-bottom:8px;border-bottom:1px solid var(--border);}
+.res-accepted .res-group-label{color:var(--forest);}
+.res-conflict .res-group-label{color:#8B6914;}
+.res-quarantine .res-group-label{color:#C0543F;}
+.entity-row{padding:10px 0;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;animation:fadeInUp .3s ease both;}
+.entity-row:last-child{border-bottom:none;}
+.entity-name{font-family:var(--mono);font-size:11px;color:var(--charcoal);flex-shrink:0;min-width:120px;}
+.entity-bar-wrap{flex:1;height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
+.entity-bar{height:100%;width:0;border-radius:2px;transition:width 1.2s cubic-bezier(.16,1,.3,1);}
+.entity-bar-accepted{background:linear-gradient(90deg,var(--forest),#5EBF8A);}
+.entity-bar-conflict{background:linear-gradient(90deg,#8B6914,#C9A84C);}
+.entity-bar-q{background:linear-gradient(90deg,#C0543F,#E07B6A);}
+.entity-pct{font-family:var(--mono);font-size:10px;flex-shrink:0;}
+.entity-row.accepted .entity-pct{color:var(--forest);}
+.entity-row.quarantine .entity-pct{color:#C0543F;}
+.results-footer{display:grid;grid-template-columns:repeat(3,1fr);}
+.res-stat{padding:20px 28px;text-align:center;border-right:1px solid var(--border);}
+.res-stat:last-child{border-right:none;}
+.res-stat-n{font-family:var(--serif);font-size:32px;font-weight:700;color:var(--charcoal);}
+.res-stat-l{font-family:var(--mono);font-size:9px;color:var(--light);letter-spacing:2px;text-transform:uppercase;margin-top:4px;}
+
+/* ARCHITECTURE */
+.arch-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);}
+.arch-card{
+  background:var(--white);padding:36px 28px;cursor:pointer;
+  transition:all .3s;position:relative;overflow:hidden;
+}
+.arch-card::before{content:'';position:absolute;bottom:0;left:0;right:0;height:3px;background:var(--gold-light);transform:scaleX(0);transition:transform .3s;}
+.arch-card:hover::before,.arch-card.open::before{transform:scaleX(1);}
+.arch-card:hover{background:var(--gold-pale);}
+.arch-card.open{background:var(--gold-pale);}
+.arch-num{font-family:var(--mono);font-size:10px;color:var(--light);letter-spacing:2px;margin-bottom:20px;}
+.arch-icon{font-size:28px;margin-bottom:16px;display:block;}
+.arch-name{font-family:var(--serif);font-size:18px;font-weight:700;color:var(--charcoal);margin-bottom:8px;}
+.arch-brief{font-family:var(--mono);font-size:10px;color:var(--mid);line-height:1.7;letter-spacing:.3px;}
+.arch-expand{display:none;grid-column:1/-1;background:var(--charcoal);padding:32px 40px;animation:fadeInUp .3s ease;}
+.arch-expand.show{display:block;}
+.arch-expand-title{font-family:var(--mono);font-size:10px;color:var(--gold);letter-spacing:2px;text-transform:uppercase;margin-bottom:20px;}
+.arch-expand-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;}
+.arch-detail-item{display:flex;gap:12px;}
+.arch-detail-item::before{content:'→';color:var(--gold);font-family:var(--mono);font-size:11px;flex-shrink:0;margin-top:1px;}
+.arch-detail-text{font-family:var(--mono);font-size:11px;color:rgba(253,250,247,.6);line-height:1.6;}
+
+/* TIERS */
+.tiers-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);}
+.tier-card{background:var(--white);padding:44px 36px;transition:all .3s;cursor:pointer;position:relative;overflow:hidden;}
+.tier-card::after{content:'';position:absolute;inset:0;opacity:0;transition:opacity .3s;}
+.tier-acc::after{background:linear-gradient(135deg,rgba(30,58,47,.04),transparent);}
+.tier-conf::after{background:linear-gradient(135deg,rgba(184,150,90,.06),transparent);}
+.tier-qua::after{background:linear-gradient(135deg,rgba(192,84,63,.04),transparent);}
+.tier-card:hover::after{opacity:1;}
+.tier-card:hover{transform:translateY(-4px);box-shadow:var(--shadow);}
+.tier-score{font-family:var(--serif);font-size:52px;font-weight:900;margin-bottom:8px;letter-spacing:-2px;}
+.tier-acc  .tier-score{color:var(--forest);}
+.tier-conf .tier-score{color:var(--gold);}
+.tier-qua  .tier-score{color:#C0543F;}
+.tier-lbl{font-family:var(--mono);font-size:10px;letter-spacing:2px;text-transform:uppercase;margin-bottom:20px;padding-bottom:12px;border-bottom:1px solid var(--border);}
+.tier-acc .tier-lbl{color:var(--forest);}
+.tier-conf .tier-lbl{color:var(--gold);}
+.tier-qua  .tier-lbl{color:#C0543F;}
+.tier-body{font-family:var(--italic);font-size:16px;font-weight:300;color:var(--mid);line-height:1.65;}
+.tier-info-box{display:none;grid-column:1/-1;background:var(--charcoal);padding:28px 36px;border-top:1px solid var(--border);}
+.tier-info-box.show{display:block;animation:fadeInUp .3s ease;}
+.tier-info-text{font-family:var(--mono);font-size:11px;color:rgba(253,250,247,.65);line-height:1.8;}
+.tier-info-text strong{color:var(--gold-light);}
+
+/* CONFIDENCE CALCULATOR */
+.calc-layout{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);}
+.calc-inputs{background:var(--white);padding:44px 40px;}
+.calc-output{background:var(--charcoal);padding:44px 40px;display:flex;flex-direction:column;align-items:center;justify-content:center;}
+.calc-h{font-family:var(--serif);font-size:20px;font-weight:600;color:var(--charcoal);margin-bottom:36px;}
+.slider-row{margin-bottom:28px;}
+.slider-top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px;}
+.slider-name{font-family:var(--mono);font-size:11px;color:var(--ink);letter-spacing:.5px;}
+.slider-pct{font-family:var(--serif);font-size:22px;font-weight:700;color:var(--gold);}
+input[type=range]{
+  width:100%;-webkit-appearance:none;
+  height:2px;background:var(--border);outline:none;border-radius:1px;cursor:pointer;
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:18px;height:18px;border-radius:50%;
+  background:var(--charcoal);border:2px solid var(--gold);cursor:pointer;
+  transition:transform .15s,box-shadow .15s;
+}
+input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.25);box-shadow:0 0 0 4px var(--gold-pale);}
+.calc-ring{
+  width:160px;height:160px;border-radius:50%;
+  border:2px solid rgba(184,150,90,.3);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  position:relative;transition:all .4s;margin-bottom:24px;
+}
+.calc-ring-score{font-family:var(--serif);font-size:48px;font-weight:900;color:var(--ivory);transition:color .3s;}
+.calc-ring-label{font-family:var(--mono);font-size:9px;color:rgba(253,250,247,.4);letter-spacing:2px;text-transform:uppercase;margin-top:4px;}
+.calc-badge{
+  font-family:var(--mono);font-size:11px;padding:10px 24px;letter-spacing:1.5px;
+  border:1px solid;transition:all .3s;text-transform:uppercase;
+}
+
+/* KNOWLEDGE GRAPH */
+.kg-wrap{background:var(--white);border:1px solid var(--border);box-shadow:var(--shadow);position:relative;overflow:hidden;}
+#kg{display:block;width:100%;height:380px;}
+.kg-hint{position:absolute;bottom:16px;right:20px;font-family:var(--mono);font-size:10px;color:var(--light);letter-spacing:1px;}
+.kg-legend{display:flex;gap:24px;flex-wrap:wrap;padding:16px 24px;border-top:1px solid var(--border);}
+.kg-leg-item{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:10px;color:var(--mid);letter-spacing:.5px;}
+.kg-swatch{width:10px;height:10px;border-radius:50%;}
+
+/* LORA */
+.lora-table{border:1px solid var(--border);background:var(--white);}
+.lora-row{display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid var(--border);transition:background .2s;}
+.lora-row:last-child{border-bottom:none;}
+.lora-row:hover{background:var(--gold-pale);}
+.lora-k,.lora-v{padding:18px 28px;}
+.lora-k{font-family:var(--mono);font-size:11px;color:var(--mid);letter-spacing:1px;border-right:1px solid var(--border);}
+.lora-v{font-family:var(--serif);font-size:16px;font-weight:600;color:var(--charcoal);}
+
+/* DRIFT */
+.drift-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;margin-bottom:40px;}
+.drift-card{background:var(--white);border:1px solid var(--border);padding:36px 28px;transition:all .3s;}
+.drift-card:hover{transform:translateY(-4px);box-shadow:var(--shadow);}
+.drift-n{font-family:var(--mono);font-size:10px;color:var(--gold);letter-spacing:2px;margin-bottom:16px;}
+.drift-title{font-family:var(--serif);font-size:20px;font-weight:600;color:var(--charcoal);margin-bottom:12px;}
+.drift-body{font-family:var(--italic);font-size:15px;font-weight:300;color:var(--mid);line-height:1.65;}
+.formula{background:var(--charcoal);padding:28px 36px;display:flex;flex-direction:column;gap:8px;}
+.formula-label{font-family:var(--mono);font-size:10px;color:var(--gold);letter-spacing:2px;text-transform:uppercase;}
+.formula-eq{font-family:var(--mono);font-size:14px;color:var(--ivory);letter-spacing:1px;}
+
+/* DOCKER */
+.docker-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);}
+.dc-card{background:var(--white);padding:36px 28px;transition:background .25s;}
+.dc-card:hover{background:var(--gold-pale);}
+.dc-status{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:10px;color:var(--forest);letter-spacing:1px;margin-bottom:16px;}
+.dc-name{font-family:var(--serif);font-size:20px;font-weight:600;color:var(--charcoal);margin-bottom:6px;}
+.dc-port{font-family:var(--mono);font-size:11px;color:var(--gold);}
+.dc-desc{font-family:var(--italic);font-size:14px;font-weight:300;color:var(--mid);margin-top:10px;line-height:1.6;}
+.terminal-block{background:var(--charcoal);padding:28px 32px;font-family:var(--mono);font-size:12px;line-height:1.9;margin-bottom:1px;border:1px solid rgba(184,150,90,.15);}
+.tbar{display:flex;align-items:center;gap:8px;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid rgba(255,255,255,.06);}
+.td{width:10px;height:10px;border-radius:50%;}
+.td-r{background:#FF5F56;}.td-y{background:#FFBD2E;}.td-g{background:#27C93F;}
+.tl{color:rgba(253,250,247,.3);font-size:10px;letter-spacing:1px;margin-left:6px;}
+.tg{color:#5EBF8A;}.ta{color:var(--gold-light);}.ty{color:#F5C977;}.tw{color:var(--ivory);}
+
+/* STACK */
+.stack-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:1px;background:var(--border);}
+.stack-card{background:var(--white);padding:28px 24px;transition:all .25s;cursor:default;position:relative;overflow:hidden;}
+.stack-card::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:var(--gold);transform:scaleX(0);transition:transform .3s;}
+.stack-card:hover{background:var(--gold-pale);transform:translateY(-3px);}
+.stack-card:hover::after{transform:scaleX(1);}
+.sk-icon{font-size:24px;margin-bottom:12px;display:block;}
+.sk-name{font-family:var(--serif);font-size:15px;font-weight:600;color:var(--charcoal);margin-bottom:4px;}
+.sk-role{font-family:var(--mono);font-size:10px;color:var(--light);letter-spacing:1px;}
+
+/* FOOTER */
+footer{background:var(--charcoal);padding:64px 60px;display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:32px;}
+.footer-logo{font-family:var(--serif);font-size:28px;font-weight:700;color:var(--ivory);}
+.footer-logo em{font-style:italic;color:var(--gold);}
+.footer-sub{font-family:var(--mono);font-size:10px;color:rgba(253,250,247,.3);letter-spacing:2px;text-transform:uppercase;margin-top:8px;line-height:1.8;}
+.footer-links{display:flex;gap:28px;flex-wrap:wrap;justify-content:flex-end;}
+.footer-links a{font-family:var(--mono);font-size:10px;color:rgba(253,250,247,.4);text-decoration:none;letter-spacing:1.5px;text-transform:uppercase;transition:color .2s;}
+.footer-links a:hover{color:var(--gold-light);}
+.footer-rule{width:100%;height:1px;background:rgba(184,150,90,.2);margin-bottom:40px;}
+
+/* ANIMATIONS */
+@keyframes fadeInUp{from{opacity:0;transform:translateY(24px);}to{opacity:1;transform:translateY(0);}}
+.reveal{opacity:0;transform:translateY(20px);transition:opacity .7s ease,transform .7s ease;}
+.reveal.visible{opacity:1;transform:translateY(0);}
+
+/* SCROLLBAR */
+::-webkit-scrollbar{width:6px;height:6px;}
+::-webkit-scrollbar-track{background:var(--cream);}
+::-webkit-scrollbar-thumb{background:var(--border);}
+::-webkit-scrollbar-thumb:hover{background:var(--gold);}
+
+/* ═══ MOBILE ═══ */
+@media(max-width:900px){
+  nav{padding:16px 24px;}
+  nav.scrolled{padding:12px 24px;}
+  .nav-links,.nav-pill{display:none;}
+  .hamburger{display:flex;}
+
+  .hero{padding:100px 24px 64px;}
+  .hero-label,.hero-number{display:none;}
+  .hero-bg-text{display:none;}
+  .live-chip{position:static;margin-top:32px;}
+  .hero-actions{flex-direction:column;}
+  .btn-gold,.btn-outline{text-align:center;padding:16px 28px;}
+
+  .stats-strip{grid-template-columns:1fr 1fr;}
+  .stat-block{padding:24px 20px;border-right:none;border-bottom:1px solid var(--border);}
+  .stat-block:nth-child(odd){border-right:1px solid var(--border);}
+  .stat-block:last-child{border-bottom:none;}
+
+  section{padding:64px 24px;}
+  .sec-header{flex-direction:column;gap:16px;margin-bottom:48px;}
+  .sec-num{display:none;}
+
+  .stages{padding:20px 16px;}
+  .log-panel{font-size:10px;}
+  .run-btn{font-size:11px;}
+  .results-grid{grid-template-columns:1fr!important;}
+  .results-col+.results-col{border-left:none;border-top:1px solid var(--border);}
+  .results-footer{grid-template-columns:repeat(3,1fr);}
+
+  .arch-grid{grid-template-columns:1fr 1fr;}
+  .arch-expand{grid-column:1/-1;}
+  .arch-expand-grid{grid-template-columns:1fr;}
+
+  .tiers-grid{grid-template-columns:1fr;}
+  .calc-layout{grid-template-columns:1fr;}
+  .calc-output{min-height:280px;}
+
+  .drift-cards{grid-template-columns:1fr;}
+  .docker-cards{grid-template-columns:1fr;}
+  .stack-grid{grid-template-columns:1fr 1fr;}
+
+  .lora-table .lora-row{grid-template-columns:1fr;}
+  .lora-k{border-right:none;border-bottom:1px solid var(--border);padding:12px 20px;}
+  .lora-v{padding:12px 20px;}
+
+  footer{padding:40px 24px;flex-direction:column;align-items:flex-start;}
+  .footer-links{justify-content:flex-start;}
+}
+@media(max-width:480px){
+  h1{font-size:52px;letter-spacing:-2px;}
+  .arch-grid{grid-template-columns:1fr;}
+  .results-footer{grid-template-columns:1fr 1fr 1fr;}
+  .stats-strip{grid-template-columns:1fr 1fr;}
+}
+</style>
+</head>
+<body>
+
+<!-- Scroll to top -->
+<button id="scrollTop" onclick="window.scrollTo({top:0,behavior:'smooth'})" aria-label="Back to top"><span class="stt-icon"></span></button>
+
+<!-- NAV -->
+<nav id="mainNav">
+  <a href="#" onclick="window.scrollTo({top:0,behavior:'smooth'});return false;" class="nav-logo" style="text-decoration:none;">BTP<em>-Nexus</em></a>
+  <ul class="nav-links">
+    <li><a href="#demo">Demo</a></li>
+    <li><a href="#architecture">Architecture</a></li>
+    <li><a href="#calculator">Confidence</a></li>
+    <li><a href="#graph">Graph</a></li>
+    <li><a href="#stack">Stack</a></li>
+  </ul>
+  <div class="nav-pill">SAP BTP Service</div>
+  <button class="hamburger" onclick="toggleNav()" aria-label="Menu">
+    <span></span><span></span><span></span>
+  </button>
+</nav>
+<div class="mobile-nav" id="mobileNav">
+  <a href="#demo"         onclick="toggleNav()">Demo</a>
+  <a href="#architecture" onclick="toggleNav()">Architecture</a>
+  <a href="#calculator"   onclick="toggleNav()">Confidence</a>
+  <a href="#graph"        onclick="toggleNav()">Graph</a>
+  <a href="#stack"        onclick="toggleNav()">Stack</a>
+</div>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-bg-text">NEXUS</div>
+  <div class="hero-label">Agentic Entity Resolution</div>
+  <div class="hero-number">v1.0 - 2026</div>
+
+  <div class="hero-content">
+    <div class="hero-eyebrow">Foundational Business Service for SAP BTP</div>
+    <h1>
+      <em>BTP</em>-Nexus
+      <span class="sub">Knowledge Graph Service</span>
+    </h1>
+    <p class="hero-desc">
+      Enterprise data is never clean. BTP-Nexus deploys a four-stage agentic pipeline
+      to reconcile messy, contradictory artifacts into a verified, time-stamped
+      Knowledge Graph - autonomously, at scale.
+    </p>
+    <div class="hero-actions">
+      <a href="#demo" class="btn-gold"><span>▶ Run the Pipeline</span></a>
+      <a href="#architecture" class="btn-outline">View Architecture</a>
+    </div>
+    <div class="live-chip">
+      <span class="pulse-dot"></span>
+      FULLY OPERATIONAL - BUILT &amp; TESTED 24 FEB 2026
+    </div>
+  </div>
+</section>
+
+<div class="rule"></div>
+
+<!-- STATS -->
+<div class="stats-strip">
+  <div class="stat-block reveal">
+    <div class="stat-n" data-count="3">0</div>
+    <div class="stat-l">Autonomous Agents</div>
+  </div>
+  <div class="stat-block reveal" style="transition-delay:.1s">
+    <div class="stat-n"><span data-count="95">0</span><em>%</em></div>
+    <div class="stat-l">Peak Confidence Score</div>
+  </div>
+  <div class="stat-block reveal" style="transition-delay:.2s">
+    <div class="stat-n">7<em>B</em></div>
+    <div class="stat-l">Parameter Fine-Tuned Model</div>
+  </div>
+  <div class="stat-block reveal" style="transition-delay:.3s">
+    <div class="stat-n" data-count="3">0</div>
+    <div class="stat-l">Docker Services</div>
+  </div>
+</div>
+
+<div class="rule"></div>
+
+<!-- INTERACTIVE DEMO -->
+<section id="demo" style="background:var(--cream);">
+  <div class="sec-header">
+    <span class="sec-num">01 /</span>
+    <div class="sec-titles">
+      <div class="rule-gold"></div>
+      <h2>Interactive <em>Pipeline</em> Simulator</h2>
+      <p class="sec-sub">Type any business text and watch the four-stage agentic pipeline process it - extraction, consensus resolution, and graph writing - all in real time.</p>
+    </div>
+  </div>
+
+  <div class="demo-wrap reveal">
+    <div class="demo-top">
+      <div class="demo-field-label">Input Artifact</div>
+      <textarea class="demo-ta" id="demoInput">Jane confirmed Project Orion budget is 1.2M under BTP cost centre CC-7740. Priya will lead the Orion-v2 sprint on S4HANA starting Q1.</textarea>
+      <div class="presets">
+        <span style="font-family:var(--mono);font-size:10px;color:var(--light);letter-spacing:1px;align-self:center;">SAMPLES:</span>
+        <button class="preset" onclick="setPreset('a')">M&amp;A Memo</button>
+        <button class="preset" onclick="setPreset('b')">ERP Change Log</button>
+        <button class="preset" onclick="setPreset('c')">Executive Email</button>
+        <button class="preset" onclick="setPreset('d')">Project Kickoff</button>
+      </div>
+    </div>
+
+    <!-- stages -->
+    <div class="stages" id="stages">
+      <div class="stg" id="stg-0"><span class="stg-icon">🎚️</span><div class="stg-lbl">De-Noiser</div><div class="stg-indicator"></div></div>
+      <div class="stg-conn" id="conn-0"></div>
+      <div class="stg" id="stg-1"><span class="stg-icon">🕵️</span><div class="stg-lbl">Extractor</div><div class="stg-indicator"></div></div>
+      <div class="stg-conn" id="conn-1"></div>
+      <div class="stg" id="stg-2"><span class="stg-icon">🔬</span><div class="stg-lbl">Resolver</div><div class="stg-indicator"></div></div>
+      <div class="stg-conn" id="conn-2"></div>
+      <div class="stg" id="stg-3"><span class="stg-icon">🏛️</span><div class="stg-lbl">Graph Writer</div><div class="stg-indicator"></div></div>
+    </div>
+
+    <button class="run-btn" id="runBtn" onclick="runDemo()">▶ &nbsp; RUN PIPELINE</button>
+
+    <!-- log -->
+    <div class="log-panel" id="logPanel">
+      <div class="log-empty">// Pipeline log will stream here - press RUN PIPELINE</div>
+    </div>
+
+    <!-- results -->
+    <div class="results" id="resultsPanel">
+      <div class="results-head">
+        <span class="results-head-label">Pipeline Results</span>
+        <span class="results-run-id" id="runIdLabel"></span>
+      </div>
+      <div class="results-grid" style="grid-template-columns:1fr 1fr 1fr">
+        <div class="results-col res-accepted">
+          <div class="res-group-label">✓ Accepted Entities</div>
+          <div id="acceptedList"></div>
+        </div>
+        <div class="results-col res-conflict">
+          <div class="res-group-label">⚡ Conflict Entities</div>
+          <div class="res-group-sub" style="font-family:var(--mono);font-size:9px;color:var(--light);margin-bottom:12px;">In graph · Pending master data</div>
+          <div id="conflictList"></div>
+        </div>
+        <div class="results-col res-quarantine">
+          <div class="res-group-label">⊘ Quarantined Entities</div>
+          <div id="quarantineList"></div>
+        </div>
+      </div>
+      <div class="results-footer">
+        <div class="res-stat"><div class="res-stat-n" id="rAccepted">-</div><div class="res-stat-l">Accepted</div></div>
+        <div class="res-stat"><div class="res-stat-n" id="rConflict">-</div><div class="res-stat-l">Conflicts</div></div>
+        <div class="res-stat"><div class="res-stat-n" id="rQuarantine">-</div><div class="res-stat-l">Quarantined</div></div>
+        <div class="res-stat"><div class="res-stat-n" id="rLoops">-</div><div class="res-stat-l">Loops Used</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="rule"></div>
+
+<!-- ARCHITECTURE -->
+<section id="architecture">
+  <div class="sec-header">
+    <span class="sec-num">02 /</span>
+    <div class="sec-titles">
+      <div class="rule-gold"></div>
+      <h2>Four-Stage <em>Pipeline</em></h2>
+      <p class="sec-sub">Click any stage to inspect its implementation. Every step is auditable, containerised, and maps to a real SAP BTP service.</p>
+    </div>
+  </div>
+
+  <div class="arch-grid reveal" id="archGrid">
+    <div class="arch-card" onclick="toggleArch(0)">
+      <div class="arch-num">STAGE 01</div>
+      <span class="arch-icon">🎚️</span>
+      <div class="arch-name">Entity De-Noiser</div>
+      <div class="arch-brief">Strips boilerplate · Resolves aliases · Normalises OCR artifacts and formats</div>
+    </div>
+    <div class="arch-card" onclick="toggleArch(1)">
+      <div class="arch-num">STAGE 02</div>
+      <span class="arch-icon">🕵️</span>
+      <div class="arch-name">Extractor Agent</div>
+      <div class="arch-brief">Mistral-7B + LoRA · Outputs typed JSON: Person, Product, Project, Budget, Org</div>
+    </div>
+    <div class="arch-card" onclick="toggleArch(2)">
+      <div class="arch-num">STAGE 03</div>
+      <span class="arch-icon">🔬</span>
+      <div class="arch-name">Forensic Resolver</div>
+      <div class="arch-brief">70/30 Consensus Logic · Cross-references Neo4j · Autonomous loop-back on conflicts</div>
+    </div>
+    <div class="arch-card" onclick="toggleArch(3)">
+      <div class="arch-num">STAGE 04</div>
+      <span class="arch-icon">🏛️</span>
+      <div class="arch-name">Graph Architect</div>
+      <div class="arch-brief">Idempotent MERGE writes · Bitemporal versioning · Full provenance chain</div>
+    </div>
+
+    <div class="arch-expand" id="archExpand">
+      <div class="arch-expand-title" id="archExpandTitle">IMPLEMENTATION DETAILS</div>
+      <div class="arch-expand-grid" id="archExpandGrid"></div>
+    </div>
+  </div>
+</section>
+
+<div class="rule"></div>
+
+<!-- TIERS -->
+<section style="background:var(--cream);">
+  <div class="sec-header">
+    <span class="sec-num">03 /</span>
+    <div class="sec-titles">
+      <div class="rule-gold"></div>
+      <h2>The 70/30 <em>Confidence</em> Tiers</h2>
+      <p class="sec-sub">Click a tier to expand the resolution strategy behind it.</p>
+    </div>
+  </div>
+
+  <div class="tiers-grid reveal">
+    <div class="tier-card tier-acc" onclick="showTier('acc')">
+      <div class="tier-score">≥ 70%</div>
+      <div class="tier-lbl">✓ Accepted</div>
+      <div class="tier-body">Reconciled with high confidence. Passed directly to the Graph Architect with full provenance metadata.</div>
+    </div>
+    <div class="tier-card tier-conf" onclick="showTier('conf')">
+      <div class="tier-score">30–70%</div>
+      <div class="tier-lbl">⚠ Conflict - Loop Back</div>
+      <div class="tier-body">Partial match detected. Resolver re-queries with a targeted prompt. Loops up to three times before escalating.</div>
+    </div>
+    <div class="tier-card tier-qua" onclick="showTier('qua')">
+      <div class="tier-score">&lt; 30%</div>
+      <div class="tier-lbl">⊘ Quarantined</div>
+      <div class="tier-body">Insufficient evidence to determine identity. Flagged for human data steward review with full audit context.</div>
+    </div>
+    <div class="tier-info-box" id="tierBox">
+      <div class="tier-info-text" id="tierText"></div>
+    </div>
+  </div>
+</section>
+
+<div class="rule"></div>
+
+<!-- CONFIDENCE CALCULATOR -->
+<section id="calculator">
+  <div class="sec-header">
+    <span class="sec-num">04 /</span>
+    <div class="sec-titles">
+      <div class="rule-gold"></div>
+      <h2><em>Confidence</em> Score Calculator</h2>
+      <p class="sec-sub">Adjust the sliders to explore how the Forensic Resolver scores an entity across four weighted signals.</p>
+    </div>
+  </div>
+
+  <div class="calc-layout reveal">
+    <div class="calc-inputs">
+      <div class="calc-h">Signal Weights</div>
+      <div class="slider-row">
+        <div class="slider-top"><span class="slider-name">Name Similarity (Fuzzy Match)</span><span class="slider-pct" id="sv1">75%</span></div>
+        <input type="range" min="0" max="100" value="75" id="s1" oninput="calcScore()">
+      </div>
+      <div class="slider-row">
+        <div class="slider-top"><span class="slider-name">Master Data Cross-Reference</span><span class="slider-pct" id="sv2">80%</span></div>
+        <input type="range" min="0" max="100" value="80" id="s2" oninput="calcScore()">
+      </div>
+      <div class="slider-row">
+        <div class="slider-top"><span class="slider-name">Contextual Corroboration</span><span class="slider-pct" id="sv3">60%</span></div>
+        <input type="range" min="0" max="100" value="60" id="s3" oninput="calcScore()">
+      </div>
+      <div class="slider-row">
+        <div class="slider-top"><span class="slider-name">Recency Weight (Time-Decay)</span><span class="slider-pct" id="sv4">90%</span></div>
+        <input type="range" min="0" max="100" value="90" id="s4" oninput="calcScore()">
+      </div>
+    </div>
+    <div class="calc-output">
+      <div class="calc-ring" id="calcRing">
+        <span class="calc-ring-score" id="calcScore">76%</span>
+        <span class="calc-ring-label">Confidence</span>
+      </div>
+      <div class="calc-badge" id="calcBadge">✓ ACCEPTED</div>
+      <div style="font-family:var(--mono);font-size:10px;color:rgba(253,250,247,.3);margin-top:20px;text-align:center;letter-spacing:1px;line-height:1.7;">Weighted: 30% name · 35% MDG<br/>20% context · 15% recency</div>
+    </div>
+  </div>
+</section>
+
+<div class="rule"></div>
+
+<!-- KNOWLEDGE GRAPH -->
+<section id="graph" style="background:var(--cream);">
+  <div class="sec-header">
+    <span class="sec-num">05 /</span>
+    <div class="sec-titles">
+      <div class="rule-gold"></div>
+      <h2>Live <em>Knowledge Graph</em></h2>
+      <p class="sec-sub">Accepted entities are written as nodes with relationship edges. Drag to rearrange. Hover to inspect.</p>
+    </div>
+  </div>
+
+  <div class="kg-wrap reveal">
+    <canvas id="kg"></canvas>
+    <div class="kg-hint">drag nodes to rearrange</div>
+    <div class="kg-legend">
+      <div class="kg-leg-item"><div class="kg-swatch" style="background:#2D6A4F"></div>Project</div>
+      <div class="kg-leg-item"><div class="kg-swatch" style="background:#1B6CA8"></div>Product</div>
+      <div class="kg-leg-item"><div class="kg-swatch" style="background:#8B3A3A"></div>Person</div>
+      <div class="kg-leg-item"><div class="kg-swatch" style="background:#7B6226"></div>Budget</div>
+      <div class="kg-leg-item"><div class="kg-swatch" style="background:#5A3A7A"></div>Organisation</div>
+    </div>
+  </div>
+</section>
+
+<div class="rule"></div>
+
+<!-- FINE TUNING -->
+<section>
+  <div class="sec-header">
+    <span class="sec-num">06 /</span>
+    <div class="sec-titles">
+      <div class="rule-gold"></div>
+      <h2>PEFT / LoRA <em>Fine-Tuning</em></h2>
+      <p class="sec-sub">A custom LoRA adapter on Mistral-7B learns SAP entity taxonomies, cost-centre hierarchies, and fiscal terminology.</p>
+    </div>
+  </div>
+  <div class="lora-table reveal">
+    <div class="lora-row"><div class="lora-k">Base Model</div><div class="lora-v">Mistral-7B-v0.1</div></div>
+    <div class="lora-row"><div class="lora-k">Method</div><div class="lora-v">PEFT / LoRA</div></div>
+    <div class="lora-row"><div class="lora-k">LoRA Rank (r)</div><div class="lora-v">16</div></div>
+    <div class="lora-row"><div class="lora-k">LoRA Alpha</div><div class="lora-v">32</div></div>
+    <div class="lora-row"><div class="lora-k">Target Modules</div><div class="lora-v">q_proj, v_proj</div></div>
+    <div class="lora-row"><div class="lora-k">Training Pairs</div><div class="lora-v">50,000</div></div>
+    <div class="lora-row"><div class="lora-k">Dataset Source</div><div class="lora-v">SAP MDG + Synthetic</div></div>
+    <div class="lora-row"><div class="lora-k">Learning Rate</div><div class="lora-v">2e-4</div></div>
+    <div class="lora-row"><div class="lora-k">Epochs</div><div class="lora-v">3</div></div>
+    <div class="lora-row"><div class="lora-k">Experiment Tracker</div><div class="lora-v">MLflow</div></div>
+  </div>
+</section>
+
+<div class="rule"></div>
+
+<!-- TEMPORAL DRIFT -->
+<section style="background:var(--cream);">
+  <div class="sec-header">
+    <span class="sec-num">07 /</span>
+    <div class="sec-titles">
+      <div class="rule-gold"></div>
+      <h2>Temporal <em>Drift</em> Management</h2>
+      <p class="sec-sub">Business entities are not static. BTP-Nexus tracks how they change over time - inspired by archival research methodology.</p>
+    </div>
+  </div>
+  <div class="drift-cards">
+    <div class="drift-card reveal"><div class="drift-n">01 /</div><div class="drift-title">Versioned Snapshots</div><div class="drift-body">Every Neo4j MERGE preserves prior state with valid_from / valid_to timestamps. Fully bitemporal - queryable at any historical moment.</div></div>
+    <div class="drift-card reveal" style="transition-delay:.1s"><div class="drift-n">02 /</div><div class="drift-title">Recency-Weighted Consensus</div><div class="drift-body">A time-decay factor reduces confidence for stale master data candidates. Records unseen for 18 months score lower than those updated last week.</div></div>
+    <div class="drift-card reveal" style="transition-delay:.2s"><div class="drift-n">03 /</div><div class="drift-title">Entity Stability Index</div><div class="drift-body">A weekly MLflow job computes the ESI. A declining index triggers automated re-resolution - no manual intervention required.</div></div>
+  </div>
+  <div class="formula reveal">
+    <div class="formula-label">Time-Decay Confidence Formula</div>
+    <div class="formula-eq">adjusted_confidence = raw_confidence × e<sup style="font-size:10px">( −λ × days_since_last_seen )</sup></div>
+  </div>
+</section>
+
+<div class="rule"></div>
+
+<!-- DOCKER -->
+<section>
+  <div class="sec-header">
+    <span class="sec-num">08 /</span>
+    <div class="sec-titles">
+      <div class="rule-gold"></div>
+      <h2>One Command. <em>Full Stack.</em></h2>
+      <p class="sec-sub">API, Knowledge Graph, and MLflow tracking - all containerised and orchestrated with Docker Compose.</p>
+    </div>
+  </div>
+  <div class="terminal-block reveal">
+    <div class="tbar"><div class="td td-r"></div><div class="td td-y"></div><div class="td td-g"></div><span class="tl">docker-compose up --build</span></div>
+    <div><span class="tg">btp-nexus-api</span>    <span style="color:rgba(253,250,247,.2)">|</span> <span class="tw">Application startup complete.</span></div>
+    <div><span class="tg">btp-nexus-api</span>    <span style="color:rgba(253,250,247,.2)">|</span> <span class="ta">Uvicorn running on http://0.0.0.0:8000</span></div>
+    <div><span class="ta">btp-nexus-neo4j</span>  <span style="color:rgba(253,250,247,.2)">|</span> HTTP enabled on 0.0.0.0:7474</div>
+    <div><span class="ta">btp-nexus-neo4j</span>  <span style="color:rgba(253,250,247,.2)">|</span> <span class="tg">Started.</span></div>
+    <div><span class="ty">btp-nexus-mlflow</span> <span style="color:rgba(253,250,247,.2)">|</span> <span class="tg">Listening at http://0.0.0.0:5000</span></div>
+  </div>
+  <div class="docker-cards reveal" style="transition-delay:.1s">
+    <div class="dc-card"><div class="dc-status"><span class="pulse-dot"></span>Running</div><div class="dc-name">BTP-Nexus API</div><div class="dc-port">localhost:8000/docs</div><div class="dc-desc">FastAPI · LangGraph · Full agentic pipeline as REST endpoint</div></div>
+    <div class="dc-card"><div class="dc-status"><span class="pulse-dot"></span>Running</div><div class="dc-name">Neo4j Graph DB</div><div class="dc-port">localhost:7474</div><div class="dc-desc">Real entity nodes · RUNS_ON relationships · Visual graph browser</div></div>
+    <div class="dc-card"><div class="dc-status"><span class="pulse-dot"></span>Running</div><div class="dc-name">MLflow Tracking</div><div class="dc-port">localhost:5000</div><div class="dc-desc">Confidence scores · Acceptance rates · Full experiment history</div></div>
+  </div>
+</section>
+
+<div class="rule"></div>
+
+<!-- STACK -->
+<section id="stack" style="background:var(--cream);">
+  <div class="sec-header">
+    <span class="sec-num">09 /</span>
+    <div class="sec-titles">
+      <div class="rule-gold"></div>
+      <h2>The <em>Stack</em></h2>
+      <p class="sec-sub">Every component maps to a real SAP BTP service - a deployable reference architecture.</p>
+    </div>
+  </div>
+  <div class="stack-grid">
+    <div class="stack-card reveal"><span class="sk-icon">🔗</span><div class="sk-name">LangGraph</div><div class="sk-role">State Machine</div></div>
+    <div class="stack-card reveal" style="transition-delay:.05s"><span class="sk-icon">🤖</span><div class="sk-name">Mistral-7B + LoRA</div><div class="sk-role">Extractor LLM</div></div>
+    <div class="stack-card reveal" style="transition-delay:.1s"><span class="sk-icon">🧠</span><div class="sk-name">Neo4j</div><div class="sk-role">Knowledge Graph</div></div>
+    <div class="stack-card reveal" style="transition-delay:.15s"><span class="sk-icon">📈</span><div class="sk-name">MLflow</div><div class="sk-role">Experiment Tracking</div></div>
+    <div class="stack-card reveal" style="transition-delay:.2s"><span class="sk-icon">🐳</span><div class="sk-name">Docker Compose</div><div class="sk-role">Containerisation</div></div>
+    <div class="stack-card reveal" style="transition-delay:.25s"><span class="sk-icon">⚡</span><div class="sk-name">FastAPI</div><div class="sk-role">REST API Layer</div></div>
+    <div class="stack-card reveal" style="transition-delay:.3s"><span class="sk-icon">🎛️</span><div class="sk-name">SAP AI Core</div><div class="sk-role">LLM Hosting (BTP)</div></div>
+    <div class="stack-card reveal" style="transition-delay:.35s"><span class="sk-icon">🗄️</span><div class="sk-name">SAP HANA Cloud</div><div class="sk-role">Artifact Vault</div></div>
+    <div class="stack-card reveal" style="transition-delay:.4s"><span class="sk-icon">🔌</span><div class="sk-name">Integration Suite</div><div class="sk-role">Ingestion Pipeline</div></div>
+    <div class="stack-card reveal" style="transition-delay:.45s"><span class="sk-icon">☸️</span><div class="sk-name">SAP Kyma Runtime</div><div class="sk-role">K8s Deployment</div></div>
+    <div class="stack-card reveal" style="transition-delay:.5s"><span class="sk-icon">🏛️</span><div class="sk-name">SAP MDG</div><div class="sk-role">Master Data Source</div></div>
+    <div class="stack-card reveal" style="transition-delay:.55s"><span class="sk-icon">🐍</span><div class="sk-name">Python 3.11</div><div class="sk-role">Core Runtime</div></div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-rule" style="grid-column:1/-1"></div>
+  <div>
+    <div class="footer-logo">BTP<em>-Nexus</em></div>
+    <div class="footer-sub">Agentic Entity-Resolution &amp; Knowledge-Graph Service<br/>Foundational Business Service for SAP BTP · 2026</div>
+  </div>
+  <div class="footer-links">
+    <a href="#demo">Demo</a>
+    <a href="#architecture">Architecture</a>
+    <a href="#calculator">Calculator</a>
+    <a href="#graph">Graph</a>
+    <a href="#stack">Stack</a>
+  </div>
+</footer>
+
+<script>
+
+/* ── SCROLL TO TOP ── */
+const sttBtn=document.getElementById('scrollTop');
+window.addEventListener('scroll',()=>{
+  sttBtn.classList.toggle('visible',window.scrollY>400);
+});
+
+/* ── NAV SCROLL ── */
+window.addEventListener('scroll',()=>{document.getElementById('mainNav').classList.toggle('scrolled',window.scrollY>60);});
+
+/* ── MOBILE NAV ── */
+function toggleNav(){document.getElementById('mobileNav').classList.toggle('open');}
+document.addEventListener('click',e=>{
+  const m=document.getElementById('mobileNav'),b=document.querySelector('.hamburger');
+  if(!m.contains(e.target)&&!b.contains(e.target))m.classList.remove('open');
+});
+
+/* ── SCROLL REVEAL ── */
+const revObs=new IntersectionObserver(entries=>{entries.forEach(e=>{if(e.isIntersecting)e.target.classList.add('visible');});},{threshold:.07});
+document.querySelectorAll('.reveal').forEach(el=>revObs.observe(el));
+
+/* ── COUNT ANIMATION ── */
+function animNum(el){
+  const t=+el.dataset.count,dur=1400,step=16;let c=0;
+  const i=setInterval(()=>{c=Math.min(c+t/(dur/step),t);el.textContent=Math.round(c);if(c>=t)clearInterval(i);},step);
+}
+const cntObs=new IntersectionObserver(es=>{es.forEach(e=>{if(e.isIntersecting&&e.target.dataset.count){animNum(e.target);cntObs.unobserve(e.target);}});},{threshold:.5});
+document.querySelectorAll('[data-count]').forEach(el=>cntObs.observe(el));
+
+/* ── PRESET TEXTS ── */
+const presets={
+  a:`CONFIDENTIAL M&A MEMO - Project Titan acquisition approved at $4.2B. Integration lead: Sarah Chen (CFO). Target entity: TitanCorp merged into SAP SE under cost centre CC-9981. Migration to S4HANA Cloud scheduled FY25 Q2.`,
+  b:`ERP CHANGE LOG 2024-02-14: User mrossi@sap.com updated material master for product Orion-v2 (MDG-PROD-00142). Budget reallocation from CC-7740 to CC-8821 approved by Jane Smith. S/4HANA system ID: PRD-300.`,
+  c:`Hi team - the partnership with CloudBase Inc is now official. BTP cost centre CC-5510 absorbs integration costs. Priya owns the API layer, Marco handles HANA Cloud finance mapping. Kick-off Monday.`,
+  d:`PROJECT KICKOFF - ORION v2 Sprint 1. Product Owner: Jane Smith. Tech Lead: Priya K. Budget: USD 800k under BTP. Key dependency: SAP Integration Suite → Ariba → S4HANA. Go-live: Q3 FY2025.`
+};
+function setPreset(k){document.getElementById('demoInput').value=presets[k];resetDemo();}
+
+function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
+
+function resetDemo(){
+  [0,1,2,3].forEach(i=>{document.getElementById('stg-'+i).className='stg';});
+  [0,1,2].forEach(i=>{document.getElementById('conn-'+i).classList.remove('lit');});
+  document.getElementById('logPanel').innerHTML='<div class="log-empty">// Pipeline log will stream here - press RUN PIPELINE</div>';
+  document.getElementById('resultsPanel').classList.remove('show');
+}
+
+function addLog(html,cls=''){
+  const p=document.getElementById('logPanel');
+  if(p.querySelector('.log-empty'))p.innerHTML='';
+  const d=document.createElement('div');
+  d.className='log-item '+(cls?'l-'+cls:'l-dim');
+  d.innerHTML=html;p.appendChild(d);p.scrollTop=p.scrollHeight;
+}
+
+/* ── BACKEND API CALL ── */
+/* ── BACKEND API CALL → POST /resolve ── */
+async function callBackend(text) {
+  const res = await fetch('http://localhost:8000/resolve', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text, artifact_id: null }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `API error ${res.status}`);
+  }
+  return res.json();
+}
+
+async function runDemo(){
+  const btn=document.getElementById('runBtn');
+  btn.disabled=true; btn.textContent='⟳  RUNNING PIPELINE...';
+  resetDemo();
+  const text=document.getElementById('demoInput').value.trim();
+  if(!text){btn.disabled=false;btn.innerHTML='▶ &nbsp; RUN PIPELINE';return;}
+
+  // STAGE 0 — DE-NOISER (visual only, real cleaning happens in the backend)
+  document.getElementById('stg-0').className='stg active';
+  addLog('<span class="l-gold">[BTP-NEXUS]</span> Initialising pipeline...','');
+  await sleep(300);
+  addLog('<span class="l-gold">[DE-NOISER]</span> Normalising artifact text...','');
+  await sleep(400);
+  addLog('<span class="l-dim">[DE-NOISER]</span> Alias expansion + boilerplate removal applied','');
+  document.getElementById('stg-0').className='stg done';
+  document.getElementById('conn-0').classList.add('lit');
+  await sleep(200);
+
+  // STAGE 1 — EXTRACTOR
+  document.getElementById('stg-1').className='stg active';
+  addLog('<span class="l-gold">[EXTRACTOR]</span> Sending to backend — <span class="l-blue">llama-3.3-70b-versatile via Groq</span>...','');
+  addLog('<span class="l-dim">[COREF]</span>     Resolving coreferences and normalising amounts...','');
+  addLog('<span class="l-dim">[CRITIQUE]</span>  Self-reviewing extraction for missed entities...','');
+
+  // STAGE 2 — RESOLVER (both run server-side; animate stages while waiting)
+  document.getElementById('stg-2').className='stg active';
+  addLog('<span class="l-gold">[RESOLVER]</span>  Querying Master Data Graph + 70/30 Consensus Logic...','');
+
+  let result;
+  try {
+    result = await callBackend(text);
+  } catch(err) {
+    addLog(`<span class="l-red">[ERROR]</span> ${err.message}`,'');
+    btn.disabled=false; btn.innerHTML='▶ &nbsp; RUN PIPELINE';
+    // Mark failed stages
+    document.getElementById('stg-1').className='stg';
+    document.getElementById('stg-2').className='stg';
+    return;
+  }
+
+  // Unpack response from /resolve
+  const accepted    = (result.accepted_entities   || []).map(e => ({ ...e, name: e.raw_name || e.canonical_id || JSON.stringify(e), type: e.entity_type || e.type || 'Entity', tier: 'ACCEPTED' }));
+  const quarantined = (result.quarantined_entities || []).map(e => ({ ...e, name: e.raw_name || e.canonical_id || JSON.stringify(e), type: e.entity_type || e.type || 'Entity', tier: 'QUARANTINE' }));
+  const conflicts   = (result.conflict_entities   || []).map(e => ({ ...e, name: e.raw_name || e.canonical_id || JSON.stringify(e), type: e.entity_type || e.type || 'Entity', tier: 'CONFLICT' }));
+  const relationships = result.relationships || [];
+  const loopCount   = result.resolver_loops_used || 1;
+  const runId       = result.mlflow_run_id || Math.random().toString(16).slice(2,18);
+  const graphStatus = result.graph_write_status || '';
+
+  // Log extractor results
+  const totalEntities = accepted.length + quarantined.length;
+  document.getElementById('stg-1').className='stg done';
+  document.getElementById('conn-1').classList.add('lit');
+  addLog(`<span class="l-gold">[EXTRACTOR]</span> <span class="l-green">Found ${totalEntities} entities</span>`,'');
+
+  // Log resolver results
+  for(const e of accepted){
+    await sleep(60);
+    const conf = Math.round((e.confidence||0)*100);
+    addLog(`  <span class="l-green">✓</span> <span class="l-white">${e.name}</span> → <span class="l-dim">${e.canonical_id||'MDG-AUTO'}</span> <span class="l-green">${conf}%</span>`,'');
+  }
+  for(const e of quarantined){
+    await sleep(60);
+    const conf = Math.round((e.confidence||0)*100);
+    addLog(`  <span class="l-red">⊘</span> <span class="l-white">${e.name}</span> → quarantined <span class="l-red">${conf}%</span>`,'');
+  }
+
+  addLog(`<span class="l-gold">[RESOLVER]</span>  Done — Accepted <span class="l-green">${accepted.length}</span> · Quarantined <span class="l-red">${quarantined.length}</span> · Loops <span class="l-white">${loopCount}</span>`,'');
+  document.getElementById('stg-2').className='stg done';
+  document.getElementById('conn-2').classList.add('lit');
+  await sleep(200);
+
+  // STAGE 3 — GRAPH WRITE
+  document.getElementById('stg-3').className='stg active';
+  addLog('<span class="l-gold">[GRAPH]</span>     Writing to Neo4j Knowledge Graph...','');
+  await sleep(400);
+  for(const e of accepted){
+    await sleep(80);
+    addLog(`  <span class="l-dim">MERGE</span> (:Entity {id:"${e.canonical_id||'MDG-AUTO'}",conf:${(e.confidence||0).toFixed(2)}})`,'');
+  }
+  addLog(`<span class="l-gold">[GRAPH]</span>     <span class="l-green">${graphStatus||'SUCCESS: wrote '+accepted.length+' nodes'}</span>`,'');
+  document.getElementById('stg-3').className='stg done';
+
+  // Log LLM-extracted relationships
+  if(relationships.length > 0){
+    await sleep(150);
+    addLog(`<span class="l-gold">[RELATIONS]</span> <span class="l-green">${relationships.length} evidence-backed relationship(s) extracted</span>`,'');
+    for(const r of relationships){
+      await sleep(40);
+      addLog(`  <span class="l-dim">${r.source}</span> <span class="l-gold">─[${r.type}]→</span> <span class="l-dim">${r.target}</span>`,'');
+    }
+  } else {
+    addLog(`<span class="l-gold">[RELATIONS]</span> <span class="l-red">No explicit relationships found in text — check console for debug info</span>`,'');
+  }
+
+  await sleep(150);
+  addLog('','');
+  addLog(`<span class="l-dim">graph_write_status:</span> <span class="l-green">${graphStatus}</span>`,'');
+  addLog(`<span class="l-dim">mlflow_run_id     :</span> <span class="l-gold">${runId}</span>`,'');
+  addLog(`<span class="l-dim">resolver_loops    :</span> <span class="l-white">${loopCount}</span>`,'');
+  if(result.coref_text && result.coref_text !== text){
+    addLog('','');
+    addLog('<span class="l-gold">[COREF]</span>     Normalised text:','');
+    addLog(`  <span class="l-dim">${result.coref_text.slice(0,200)}</span>`,'');
+  }
+
+  showResults(accepted, quarantined, conflicts, runId, loopCount, relationships);
+  btn.disabled=false; btn.textContent='▶  RUN AGAIN';
+}
+
+function showResults(accepted, quarantined, conflicts, runId, loops, relationships){
+  document.getElementById('runIdLabel').textContent='Run: '+runId.slice(0,12)+'...';
+  const aList=document.getElementById('acceptedList');
+  const qList=document.getElementById('quarantineList');
+  aList.innerHTML='';qList.innerHTML='';
+  const cList=document.getElementById('conflictList');
+  if(cList) cList.innerHTML='';
+
+  const TYPE_LABELS = {
+    Person:'👤',Product:'📦',Project:'🗂️',Budget:'💰',
+    Organization:'🏢',Organisation:'🏢',Technology:'⚙️',Condition:'🔒',Entity:'◈'
+  };
+
+  accepted.forEach((e,i)=>{
+    const pct=Math.round((e.confidence||0)*100);
+    const icon=TYPE_LABELS[e.entity_type||e.type]||'◈';
+    const typeStr=e.entity_type||e.type||'Entity';
+    const d=document.createElement('div');d.className='entity-row accepted';d.style.animationDelay=(i*.07)+'s';
+    d.innerHTML=`<span class="entity-name" title="${typeStr}">${icon} ${e.name}</span><div class="entity-bar-wrap"><div class="entity-bar entity-bar-accepted" data-w="${pct}"></div></div><span class="entity-pct">${pct}%</span>`;
+    aList.appendChild(d);
+  });
+  // Render conflict entities
+  if(cList){
+    conflicts.forEach((e,i)=>{
+      const pct=Math.round((e.confidence||0)*100);
+      const pctLabel=pct>0?pct+'%':'–';
+      const barW=pct>0?pct:2;
+      const icon=TYPE_LABELS[e.entity_type||e.type]||'◈';
+      const typeStr=e.entity_type||e.type||'Entity';
+      const d=document.createElement('div');d.className='entity-row';d.style.animationDelay=(i*.07)+'s';
+      d.innerHTML=`<span class="entity-name" title="${typeStr} — pending master data">${icon} ${e.name}</span><div class="entity-bar-wrap"><div class="entity-bar entity-bar-conflict" data-w="${barW}"></div></div><span class="entity-pct" style="color:#8B6914">${pctLabel}</span>`;
+      cList.appendChild(d);
+    });
+  }
+
+  quarantined.forEach((e,i)=>{
+    const pct=Math.round((e.confidence||0)*100);
+    const pctLabel=pct>0?pct+'%':'0%';
+    const barW=pct>0?pct:2;
+    const icon=TYPE_LABELS[e.entity_type||e.type]||'◈';
+    const typeStr=e.entity_type||e.type||'Entity';
+    const d=document.createElement('div');d.className='entity-row quarantine';d.style.animationDelay=((accepted.length+i)*.07)+'s';
+    d.innerHTML=`<span class="entity-name" title="${typeStr}">${icon} ${e.name}</span><div class="entity-bar-wrap"><div class="entity-bar entity-bar-q" data-w="${barW}"></div></div><span class="entity-pct">${pctLabel}</span>`;
+    qList.appendChild(d);
+  });
+
+  document.getElementById('rAccepted').textContent=accepted.length;
+  const rConflict=document.getElementById('rConflict');
+  if(rConflict) rConflict.textContent=conflicts.length;
+  document.getElementById('rQuarantine').textContent=quarantined.length;
+  document.getElementById('rLoops').textContent=loops||1;
+  document.getElementById('resultsPanel').classList.add('show');
+  setTimeout(()=>{document.querySelectorAll('.entity-bar').forEach(b=>{b.style.width=b.dataset.w+'%';});},300);
+
+  // Live-update the confidence calculator sliders from this run's signal averages
+  updateSliders(accepted);
+
+  // Live-update the knowledge graph with real entities from this run
+  updateKG(accepted, quarantined, conflicts, relationships);
+}
+
+/* ── UPDATE SLIDERS from pipeline run ── */
+function updateSliders(accepted){
+  if(!accepted.length) return;
+
+  const normType = t => {
+    if(!t) return 'Entity';
+    const l = t.toLowerCase();
+    if(l==='organization'||l==='organisation') return 'Organisation';
+    return t.charAt(0).toUpperCase()+t.slice(1).toLowerCase();
+  };
+
+  // Derive the 4 signal scores from actual entity confidences:
+  // Name Similarity  → avg confidence of Person entities (name-heavy signal)
+  // Master Data Ref  → avg confidence of Budget/CC entities (most deterministic)
+  // Contextual Corr  → avg confidence of Organisation entities (context-dependent)
+  // Recency Weight   → avg confidence of Project entities (version-stamped, recency matters)
+  const confOf = types => {
+    const matches = accepted.filter(e => types.includes(normType(e.type||e.entity_type)));
+    if(!matches.length) return null;
+    return Math.round(matches.reduce((a,e)=>a+(e.confidence||0),0)/matches.length*100);
+  };
+
+  const globalAvg = Math.round(accepted.reduce((a,e)=>a+(e.confidence||0),0)/accepted.length*100);
+
+  // Each signal falls back to globalAvg with a small type-based offset if no entities of that type exist
+  const targets = [
+    confOf(['Person'])                      ?? Math.min(99, Math.round(globalAvg * 0.96)),  // Name Similarity
+    confOf(['Budget','Cost Centre'])        ?? Math.min(99, Math.round(globalAvg * 1.02)),  // Master Data
+    confOf(['Organisation','Organization']) ?? Math.min(99, Math.round(globalAvg * 0.92)),  // Contextual
+    confOf(['Project'])                     ?? Math.min(99, Math.round(globalAvg * 0.98)),  // Recency
+  ];
+
+  const sliders = [s1,s2,s3,s4];
+  const labels  = ['sv1','sv2','sv3','sv4'];
+  sliders.forEach((sl,i)=>{
+    const start=+sl.value, end=targets[i], dist=end-start;
+    const steps=40, interval=18;
+    let step=0;
+    const timer=setInterval(()=>{
+      step++;
+      const eased=1-Math.pow(1-step/steps,3);
+      const val=Math.round(start+dist*eased);
+      sl.value=val;
+      document.getElementById(labels[i]).textContent=val+'%';
+      if(step>=steps){sl.value=end;document.getElementById(labels[i]).textContent=end+'%';clearInterval(timer);}
+      calcScore();
+    },interval);
+  });
+}
+
+/* ── TYPE → color mapping for KG ── */
+const TYPE_COLORS = {
+  // exact matches (capitalised)
+  Project:'#2D6A4F', Product:'#1B6CA8', Person:'#8B3A3A',
+  Budget:'#7B6226', Organisation:'#5A3A7A', Technology:'#1B6CA8',
+  Organization:'#5A3A7A',
+  // lowercase variants
+  project:'#2D6A4F', product:'#1B6CA8', person:'#8B3A3A',
+  budget:'#7B6226', organisation:'#5A3A7A', technology:'#1B6CA8',
+  organization:'#5A3A7A',
+  // common aliases Claude might return
+  System:'#1B6CA8', system:'#1B6CA8',
+  Platform:'#1B6CA8', platform:'#1B6CA8',
+  Service:'#1B6CA8', service:'#1B6CA8',
+  Initiative:'#2D6A4F', initiative:'#2D6A4F',
+  Programme:'#2D6A4F', programme:'#2D6A4F', program:'#2D6A4F',
+  Company:'#5A3A7A', company:'#5A3A7A',
+  Department:'#5A3A7A', department:'#5A3A7A',
+  'Cost Centre':'#7B6226', 'cost centre':'#7B6226',
+  CostCentre:'#7B6226', costcentre:'#7B6226',
+  Amount:'#7B6226', amount:'#7B6226',
+  Condition:'#6B3A2A', condition:'#6B3A2A',  // dark terracotta — gates/clearances
+  default:'#6B6560'
+};
+
+/* Resolve a type string to its canonical colour */
+function typeColor(rawType) {
+  if(!rawType) return TYPE_COLORS.default;
+  // direct hit
+  if(TYPE_COLORS[rawType]) return TYPE_COLORS[rawType];
+  // case-insensitive hit
+  const lower = rawType.toLowerCase();
+  // walk keys looking for a lowercase match
+  for(const [k,v] of Object.entries(TYPE_COLORS)){
+    if(k.toLowerCase()===lower) return v;
+  }
+  // partial keyword match
+  if(lower.includes('person')||lower.includes('people')||lower.includes('human')) return TYPE_COLORS.Person;
+  if(lower.includes('project')||lower.includes('programme')||lower.includes('program')||lower.includes('initiative')) return TYPE_COLORS.Project;
+  if(lower.includes('product')||lower.includes('tech')||lower.includes('platform')||lower.includes('service')||lower.includes('system')||lower.includes('software')||lower.includes('cloud')) return TYPE_COLORS.Product;
+  if(lower.includes('budget')||lower.includes('cost')||lower.includes('fund')||lower.includes('amount')||lower.includes('finance')||lower.includes('fiscal')) return TYPE_COLORS.Budget;
+  if(lower.includes('org')||lower.includes('company')||lower.includes('corp')||lower.includes('dept')||lower.includes('division')||lower.includes('unit')) return TYPE_COLORS.Organisation;
+  if(lower.includes('condition')||lower.includes('clearance')||lower.includes('gate')||lower.includes('prerequisite')) return TYPE_COLORS.Condition;
+  return TYPE_COLORS.default;
+}
+
+/* ── INFER EDGE LABEL from types ── */
+function inferLabel(srcType, tgtType){
+  const k = srcType+'->'+tgtType;
+  const map = {
+    'Person->Project':'LEADS','Person->Product':'DEVELOPS','Person->Organisation':'MEMBER_OF',
+    'Project->Product':'RUNS_ON','Project->Budget':'HAS_BUDGET','Project->Organisation':'OWNED_BY',
+    'Product->Product':'INTEGRATES','Organisation->Product':'OWNS','Organisation->Project':'SPONSORS',
+    'Budget->Organisation':'UNDER','Budget->Project':'FUNDS','Technology->Product':'POWERS'
+  };
+  return map[k] || 'LINKED_TO';
+}
+
+/* ── UPDATE KNOWLEDGE GRAPH from pipeline run ── */
+function updateKG(accepted, quarantined, conflicts, relationships){
+  if(!accepted.length && !quarantined.length) return;
+
+  // Include conflicts so nodes referenced by relationships exist in the graph
+  const allEntities = [...accepted, ...quarantined, ...conflicts];
+  const nameIndex = {};
+
+  // Normalise type so Organization/Organisation/organization all resolve the same
+  const normType = t => {
+    if(!t) return 'Entity';
+    const l = t.toLowerCase();
+    if(l==='organization'||l==='organisation') return 'Organisation';
+    if(l==='person')   return 'Person';
+    if(l==='project')  return 'Project';
+    if(l==='product')  return 'Product';
+    if(l==='budget')   return 'Budget';
+    if(l==='technology') return 'Technology';
+    if(l==='condition') return 'Condition';
+    return t;
+  };
+
+  // Build nodes
+  const newNodes = allEntities.map((e,i)=>{
+    const t = normType(e.type || e.entity_type);
+    const col = typeColor(t);
+    const isQ = (e.tier==='QUARANTINE'||e.tier==='CONFLICT');
+    nameIndex[e.name] = i;
+    return {id:i, label:e.name, type:t, col:col, x:0, y:0, vx:0, vy:0, quarantined:isQ, opacity:isQ?0.35:1.0};
+  });
+
+  const newEdges = [];
+  const edgeSeen = new Set();
+  const addEdge = (a,b,lbl)=>{
+    if(a==null||b==null||a===b) return;
+    const key=Math.min(a,b)+'-'+Math.max(a,b);
+    if(!edgeSeen.has(key)){edgeSeen.add(key);newEdges.push({a,b,lbl});}
+  };
+
+  // ── Use ONLY LLM-extracted, evidence-backed relationships ──
+  // Fuzzy name resolver: handles casing differences and partial matches
+  // e.g. LLM returns "Project Orion" but nameIndex has "Orion-v2"
+  const resolveNodeId = (name) => {
+    if(!name) return null;
+    // 1. Exact match
+    if(nameIndex[name] != null) return nameIndex[name];
+    // 2. Case-insensitive exact
+    const lower = name.toLowerCase();
+    for(const [k,v] of Object.entries(nameIndex)){
+      if(k.toLowerCase() === lower) return v;
+    }
+    // 3. Substring — e.g. "Marco Rossi" contains "Marco"
+    for(const [k,v] of Object.entries(nameIndex)){
+      if(lower.includes(k.toLowerCase()) || k.toLowerCase().includes(lower)) return v;
+    }
+    return null;
+  };
+
+  console.log('[BTP-Nexus] Relationships from API:', relationships);
+  console.log('[BTP-Nexus] nameIndex:', nameIndex);
+
+  (relationships || []).forEach(rel => {
+    const a = resolveNodeId(rel.source);
+    const b = resolveNodeId(rel.target);
+    console.log(`  rel: "${rel.source}" (→${a}) --[${rel.type}]--> "${rel.target}" (→${b})  evidence: "${rel.evidence}"`);
+    if(a != null && b != null) addEdge(a, b, rel.type);
+    else console.warn(`  ⚠ dropped — could not resolve node IDs`);
+  });
+
+  // Fallback: only if API returned zero relationships
+  if(newEdges.length === 0){
+    console.warn('[BTP-Nexus] No verified relationships found — drawing UNVERIFIED fallback chain.');
+    const ids = accepted.map(e=>nameIndex[e.name]).filter(i=>i!=null);
+    for(let i=0;i<ids.length-1;i++) addEdge(ids[i],ids[i+1],'UNVERIFIED');
+  }
+
+  // Position nodes in a circle
+  if(kW && kH){
+    newNodes.forEach((n,i)=>{
+      const angle=(i/newNodes.length)*Math.PI*2;
+      const r=Math.min(kW,kH)*0.28;
+      n.x=kW/2+Math.cos(angle)*r;
+      n.y=kH/2+Math.sin(angle)*r;
+    });
+  }
+
+  nodes.length=0; newNodes.forEach(n=>nodes.push(n));
+  edges.length=0; newEdges.forEach(e=>edges.push(e));
+
+  const wrap=document.querySelector('.kg-wrap');
+  if(wrap){
+    wrap.style.transition='box-shadow .4s';
+    wrap.style.boxShadow='0 0 0 2px '+TYPE_COLORS.Project;
+    setTimeout(()=>{wrap.style.boxShadow='';},800);
+  }
+}
+
+/* ── ARCHITECTURE ── */
+const archDetails=[
+  ['Band-pass filter removes legal/compliance headers','Regex repairs OCR encoding artifacts and null bytes','Alias dictionary: S4HANA → SAP S/4HANA, etc.','Date and currency normalisation before LLM','Returns clean, standardised text string'],
+  ['Fine-tuned Mistral-7B with LoRA adapter (r=16)','Extracts: Person, Product, Project, Budget, Org','Strict JSON output schema via prompt engineering','Regex strips markdown fences before JSON parse','Each entity stamped with source_artifact_id'],
+  ['Queries Neo4j Master Data Graph for candidates','≥0.70 → ACCEPTED · 0.30–0.69 → CONFLICT · <0.30 → QUARANTINE','Conflict triggers loop-back with enriched prompt context','Max 3 resolver loops before quarantine escalation','MLflow logs confidence score per loop iteration'],
+  ['Cypher MERGE: idempotent create-or-update writes','ON MATCH: updates last_seen & confidence if higher','ON CREATE: stamps created_at & source_artifact_id','Bitemporal: valid_from / valid_to for drift queries','Graceful simulation fallback if Neo4j unreachable']
+];
+const archTitles=['De-Noiser Implementation','Extractor Agent Implementation','Forensic Resolver Implementation','Graph Architect Implementation'];
+let openArch=-1;
+function toggleArch(i){
+  document.querySelectorAll('.arch-card').forEach(c=>c.classList.remove('open'));
+  const box=document.getElementById('archExpand');
+  if(openArch===i){box.classList.remove('show');openArch=-1;return;}
+  document.getElementById('astep-'+i) // not used but kept for future
+  document.querySelectorAll('.arch-card')[i].classList.add('open');
+  document.getElementById('archExpandTitle').textContent=archTitles[i];
+  const grid=document.getElementById('archExpandGrid');
+  grid.innerHTML=archDetails[i].map(d=>`<div class="arch-detail-item"><span class="arch-detail-text">${d}</span></div>`).join('');
+  box.classList.add('show');openArch=i;
+}
+
+/* ── TIERS ── */
+const tierContent={
+  acc:`<strong>ACCEPTED TIER (≥ 70%)</strong> - The entity has been successfully reconciled against the SAP Master Data Graph with high confidence. The Graph Architect writes it as a node using Cypher MERGE, preserving full provenance. In production, this feeds downstream intelligent applications - demand forecasting, org-structure analysis, and contract management - with verified entity data.`,
+  conf:`<strong>CONFLICT TIER (30–70%)</strong> - A partial match has been found but cannot be confirmed with certainty. The Forensic Resolver autonomously re-queries the source with a more targeted prompt, expands the Cypher search radius, and re-scores using enriched context. This mirrors forensic document examination methodology - triangulating evidence before issuing a finding.`,
+  qua:`<strong>QUARANTINE TIER (&lt; 30%)</strong> - Insufficient evidence to make a confident determination. Common causes: first-name-only references, newly created entities not yet in MDG, or unresolvable OCR artifacts. Routed to the Quarantine Queue with full context - original chunk, attempted candidates, and confidence scores from each resolver loop - for human data steward review.`
+};
+let openTier='';
+function showTier(t){
+  const box=document.getElementById('tierBox');
+  if(openTier===t){box.classList.remove('show');openTier='';return;}
+  document.getElementById('tierText').innerHTML=tierContent[t];
+  box.classList.add('show');openTier=t;
+}
+
+/* ── CONFIDENCE CALCULATOR ── */
+function calcScore(){
+  const vals=[+s1.value,+s2.value,+s3.value,+s4.value];
+  ['1','2','3','4'].forEach((n,i)=>{document.getElementById('sv'+n).textContent=vals[i]+'%';});
+  const score=Math.round(vals[0]*.30+vals[1]*.35+vals[2]*.20+vals[3]*.15);
+  const el=document.getElementById('calcScore');
+  const ring=document.getElementById('calcRing');
+  const badge=document.getElementById('calcBadge');
+  el.textContent=score+'%';
+  if(score>=70){
+    el.style.color='#F7F3EE';
+    ring.style.borderColor='rgba(93,190,138,.5)';ring.style.boxShadow='0 0 40px rgba(93,190,138,.15)';
+    badge.style.color='#5EBF8A';badge.style.borderColor='#5EBF8A';badge.style.background='rgba(93,190,138,.08)';badge.textContent='✓ ACCEPTED';
+  }else if(score>=30){
+    el.style.color='#F7F3EE';
+    ring.style.borderColor='rgba(184,150,90,.5)';ring.style.boxShadow='0 0 40px rgba(184,150,90,.15)';
+    badge.style.color=b='#D4B483';badge.style.borderColor='#D4B483';badge.style.background='rgba(184,150,90,.1)';badge.textContent='⚠ CONFLICT';
+  }else{
+    el.style.color='#F7F3EE';
+    ring.style.borderColor='rgba(192,84,63,.5)';ring.style.boxShadow='0 0 40px rgba(192,84,63,.15)';
+    badge.style.color='#E07B6A';badge.style.borderColor='#E07B6A';badge.style.background='rgba(192,84,63,.08)';badge.textContent='⊘ QUARANTINED';
+  }
+}
+const s1=document.getElementById('s1'),s2=document.getElementById('s2'),s3=document.getElementById('s3'),s4=document.getElementById('s4');
+calcScore();
+
+/* ── KNOWLEDGE GRAPH ── */
+const nodes=[
+  {id:0,label:'Orion-v2',   type:'Project',     col:'#2D6A4F'},
+  {id:1,label:'SAP S/4HANA',type:'Product',     col:'#1B6CA8'},
+  {id:2,label:'Jane Smith', type:'Person',      col:'#8B3A3A'},
+  {id:3,label:'CC-7740',    type:'Budget',      col:'#7B6226'},
+  {id:4,label:'HANA Cloud', type:'Product',     col:'#1B6CA8'},
+  {id:5,label:'SAP BTP',    type:'Product',     col:'#1B6CA8'},
+  {id:6,label:'Priya',      type:'Person',      col:'#8B3A3A'},
+  {id:7,label:'SAP SE',     type:'Organisation',col:'#5A3A7A'},
+];
+const edges=[
+  {a:2,b:0,lbl:'LEADS'},{a:6,b:0,lbl:'DEVELOPS'},
+  {a:0,b:1,lbl:'RUNS_ON'},{a:0,b:3,lbl:'HAS_BUDGET'},
+  {a:1,b:4,lbl:'INTEGRATES'},{a:0,b:5,lbl:'DEPLOYED_ON'},
+  {a:7,b:5,lbl:'OWNS'},{a:7,b:1,lbl:'OWNS'},{a:3,b:7,lbl:'UNDER'},
+];
+
+let kg,kctx,kW,kH,drag=null,hov=null;
+nodes.forEach((n,i)=>{n.x=0;n.y=0;n.vx=0;n.vy=0;});
+
+function initKG(){
+  kg=document.getElementById('kg');kctx=kg.getContext('2d');
+  resizeKG();
+  window.addEventListener('resize',resizeKG);
+  kg.addEventListener('mousemove',e=>{const p=kgPos(e);hov=kgNode(p);kg.style.cursor=hov?'grab':'default';if(drag){drag.x=p.x;drag.y=p.y;drag.vx=0;drag.vy=0;}});
+  kg.addEventListener('mousedown',e=>{drag=kgNode(kgPos(e));});
+  kg.addEventListener('mouseup',()=>drag=null);
+  kg.addEventListener('mouseleave',()=>{drag=null;hov=null;});
+  kg.addEventListener('touchstart',e=>{drag=kgNode(kgTPos(e));},{passive:true});
+  kg.addEventListener('touchmove',e=>{const p=kgTPos(e);if(drag){drag.x=p.x;drag.y=p.y;drag.vx=0;drag.vy=0;}},{passive:true});
+  kg.addEventListener('touchend',()=>drag=null);
+  kgAnim();
+}
+function resizeKG(){kW=kg.width=kg.parentElement.offsetWidth;kH=kg.height=380;nodes.forEach((n,i)=>{if(n.x===0&&n.y===0){const a=(i/nodes.length)*Math.PI*2;n.x=kW/2+Math.cos(a)*Math.min(kW,kH)*.28;n.y=kH/2+Math.sin(a)*Math.min(kW,kH)*.26;}});}
+function kgPos(e){const r=kg.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top};}
+function kgTPos(e){const r=kg.getBoundingClientRect(),t=e.touches[0];return{x:t.clientX-r.left,y:t.clientY-r.top};}
+function kgNode(p){return nodes.find(n=>Math.hypot(n.x-p.x,n.y-p.y)<22)||null;}
+
+function kgAnim(){
+  kctx.clearRect(0,0,kW,kH);
+  // physics
+  nodes.forEach(n=>{
+    if(n===drag)return;
+    nodes.forEach(m=>{if(m===n)return;const dx=n.x-m.x,dy=n.y-m.y,d=Math.max(Math.hypot(dx,dy),1),f=1400/(d*d);n.vx+=dx/d*f;n.vy+=dy/d*f;});
+    n.vx+=(kW/2-n.x)*.0018;n.vy+=(kH/2-n.y)*.0018;
+    edges.forEach(e=>{if(e.a!==n.id&&e.b!==n.id)return;const m=nodes[e.a===n.id?e.b:e.a];const dx=m.x-n.x,dy=m.y-n.y,d=Math.max(Math.hypot(dx,dy),1),f=(d-110)*.028;n.vx+=dx/d*f;n.vy+=dy/d*f;});
+    n.vx*=.86;n.vy*=.86;n.x=Math.max(34,Math.min(kW-34,n.x+n.vx));n.y=Math.max(34,Math.min(kH-34,n.y+n.vy));
+  });
+
+  // edges
+  edges.forEach(e=>{
+    const a=nodes[e.a],b=nodes[e.b];
+    const dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy);
+    const hi=hov&&(hov.id===e.a||hov.id===e.b);
+    kctx.strokeStyle=hi?'rgba(184,150,90,.85)':'rgba(100,85,65,.55)';
+    kctx.lineWidth=hi?1.8:1.2;
+    kctx.beginPath();kctx.moveTo(a.x,a.y);kctx.lineTo(b.x,b.y);kctx.stroke();
+    // arrowhead
+    const mx2=a.x+dx*.6,my2=a.y+dy*.6,nx=-dy/d,ny=dx/d;
+    kctx.beginPath();kctx.moveTo(mx2+nx*5,my2+ny*5);kctx.lineTo(mx2+dx/d*10,my2+dy/d*10);kctx.lineTo(mx2-nx*5,my2-ny*5);
+    kctx.fillStyle=hi?'rgba(184,150,90,.85)':'rgba(100,85,65,.55)';kctx.fill();
+    if(hi){kctx.font='10px DM Mono,monospace';kctx.fillStyle='rgba(184,150,90,.9)';kctx.textAlign='center';kctx.fillText(e.lbl,a.x+dx*.45,a.y+dy*.45-10);}
+  });
+
+  // nodes
+  nodes.forEach(n=>{
+    const hi=n===hov||n===drag,r=hi?24:18;
+    const alpha = n.opacity != null ? n.opacity : 1.0;
+    kctx.globalAlpha = alpha;
+    if(hi){const g=kctx.createRadialGradient(n.x,n.y,0,n.x,n.y,r*2.5);g.addColorStop(0,n.col+'33');g.addColorStop(1,'transparent');kctx.beginPath();kctx.arc(n.x,n.y,r*2.5,0,Math.PI*2);kctx.fillStyle=g;kctx.fill();}
+    // node circle
+    kctx.beginPath();kctx.arc(n.x,n.y,r,0,Math.PI*2);
+    const fill=kctx.createRadialGradient(n.x-r*.3,n.y-r*.3,0,n.x,n.y,r);
+    fill.addColorStop(0,n.col+'CC');fill.addColorStop(1,n.col+'88');
+    kctx.fillStyle=fill;kctx.fill();
+    kctx.strokeStyle=n.col;kctx.lineWidth=hi?2:1.5;kctx.stroke();
+    // dashed border for quarantined
+    if(n.quarantined){kctx.setLineDash([3,3]);kctx.strokeStyle=n.col;kctx.lineWidth=1;kctx.stroke();kctx.setLineDash([]);}
+    kctx.globalAlpha = 1.0;
+    // label
+    kctx.globalAlpha = alpha * 0.9;
+    kctx.font=`${hi?'600 ':''}12px DM Mono,monospace`;
+    kctx.fillStyle=hi?'#1C1C1E':'#2D2D2D';kctx.textAlign='center';
+    kctx.fillText(n.label,n.x,n.y+r+15);
+    if(hi){kctx.font='10px DM Mono,monospace';kctx.fillStyle='rgba(107,101,96,.8)';kctx.fillText(n.type,n.x,n.y+r+27);}
+    kctx.globalAlpha = 1.0;
+  });
+
+  requestAnimationFrame(kgAnim);
+}
+const kgObs=new IntersectionObserver(es=>{es.forEach(e=>{if(e.isIntersecting){initKG();kgObs.disconnect();}});},{threshold:.1});
+kgObs.observe(document.getElementById('kg'));
+</script>
+</body>
+</html>
